@@ -184,7 +184,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     function fit(width: number, height: number, index: number, progress: number) {
       camera.aspect = width / height;
       const distance = Math.max(index === 1 ? 4.1 : 3.2, (index === 1 && innerWidth < 701 ? 4.8 : 5.6) / camera.aspect) / Math.tan(THREE.MathUtils.degToRad(19));
-      camera.position.set(Math.sin((progress - .5) * 1.4) * 1.1, (progress - .5) * .7, distance * (1.12 - .12 * Math.sin(progress * Math.PI)));
+      camera.position.set(Math.sin((progress - .5) * 1.4) * 1.1, (progress - .5) * .7, distance * (index === 1 && innerWidth < 701 ? .84 : 1) * (1.12 - .12 * Math.sin(progress * Math.PI)));
       camera.lookAt(0, 0, 0);camera.updateProjectionMatrix();camera.updateMatrixWorld();
     }
     function draw(now: number) {
