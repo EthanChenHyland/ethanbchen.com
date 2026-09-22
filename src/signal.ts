@@ -81,7 +81,7 @@ export function setupSignal(signal: AbortSignal): void {
   const preference = () => {
     cancelAnimationFrame(frame);
     frame = 0;
-    if (scopeInstruction) scopeInstruction.textContent = reduced.matches ? 'FOCUS THE LINKS TO PREVIEW' : 'SCROLL / PREVIEW THE INPUTS';
+    if (scopeInstruction) scopeInstruction.textContent = reduced.matches ? 'FOCUS THE LINKS TO PREVIEW' : 'SCROLL / PREVIEW THE FILES';
     if (reduced.matches) draw();
     else schedule();
   };
