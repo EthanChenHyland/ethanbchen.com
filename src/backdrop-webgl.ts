@@ -16,15 +16,16 @@ export function createBackdrop(parent: AbortSignal): void {
   const material = <T extends THREE.Material>(m: T): T => { materials.push(m);return m; };
   const route = new THREE.CatmullRomCurve3(Array.from({ length: 37 }, (_, i) => new THREE.Vector3(Math.sin(i * .49) * 5, Math.cos(i * .36) * 3, 18 - i * 9)), false, 'catmullrom', .35);
   const color = new THREE.Color('#315bff');
-  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uForm: { value: 0 }, uIntro: { value: 0 }, uScoreTime: { value: 0 }, uPlaying: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
+  const accent = new THREE.Color('#526cff');
+  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uAccent: { value: accent.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uForm: { value: 0 }, uIntro: { value: 0 }, uScoreTime: { value: 0 }, uPlaying: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
   const ribbonMaterial = material(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms,
     vertexShader: `
-      varying vec2 vUv;varying float vDepth;
+      varying vec2 vUv;varying float vDepth;varying float vFiber;
       uniform float uTime;uniform float uEnergy;uniform float uResolve;uniform float uForm;uniform float uIntro;uniform float uScoreTime;uniform float uPlaying;uniform vec2 uPointer;
       uniform float uPressure;uniform float uPulse;uniform float uPulseAge;uniform float uHead;
-      attribute vec3 aCenter;
+      attribute vec3 aCenter;attribute float aFiber;
       void main(){
-        vUv=uv;vec3 p=mix(position,aCenter,uResolve*.985);
+        vUv=uv;vFiber=aFiber;vec3 p=mix(position,aCenter,uResolve*.985);
         float wave=sin((uv.x-uHead)*170.-uPulseAge*9.);
         float envelope=exp(-pow((uv.x-uHead-uPulseAge*.035)*20.,2.));
         p.xy+=(position.xy-aCenter.xy)*wave*envelope*uPulse*.12;
@@ -50,22 +51,26 @@ export function createBackdrop(parent: AbortSignal): void {
         clip.xy+=delta*nearPointer*.28*clip.w;
         gl_Position=clip;
       }`,
-    fragmentShader: `varying vec2 vUv;varying float vDepth;uniform vec3 uColor;uniform float uHead;uniform float uQuiet;uniform float uPulse;uniform float uTime;
-      void main(){float edges=pow(abs(vUv.y-.5)*2.,12.);float dash=smoothstep(.45,.55,sin(vUv.x*640.-uTime*3.));float head=exp(-pow((vUv.x-uHead)*35.,2.));float distanceFade=smoothstep(1.,7.,vDepth)*(1.-smoothstep(65.,125.,vDepth));float stream=pow(max(0.,sin(vUv.x*110.-uTime*1.8)),18.);float alpha=(.19+edges*.62+dash*.065+stream*.2+head*(.28+uPulse*.65))*distanceFade*uQuiet;gl_FragColor=vec4(uColor,alpha);#include <colorspace_fragment>
+    fragmentShader: `varying vec2 vUv;varying float vDepth;varying float vFiber;uniform vec3 uColor;uniform vec3 uAccent;uniform float uHead;uniform float uQuiet;uniform float uPulse;uniform float uTime;
+      void main(){float edge=pow(abs(vUv.y-.5)*2.,8.);float head=exp(-pow((vUv.x-uHead)*35.,2.));float distanceFade=smoothstep(1.,7.,vDepth)*(1.-smoothstep(65.,125.,vDepth));float glint=pow(max(0.,sin(vUv.x*130.-uTime*2.2-vUv.y*9.)),22.);float flow=pow(max(0.,sin(vUv.x*65.-uTime*1.4)),12.);float sheet=.075+edge*.5+glint*.2+flow*.09+head*(.17+uPulse*.3);float thread=.54+glint*.28+flow*.17+head*(.21+uPulse*.45);float alpha=mix(sheet,thread,vFiber)*distanceFade*uQuiet;vec3 ink=mix(uColor,uAccent,clamp(.12+vUv.y*.35+glint*.18+vFiber*.16,0.,1.));ink=mix(ink,vec3(1.),glint*.14);gl_FragColor=vec4(ink,alpha);#include <colorspace_fragment>
       }`.replace(';#include', ';\n#include')
   }));
-  // The same three traces travel past every project. They periodically flatten,
-  // separate, and twist, but do not reset at section boundaries.
-  for (let strand = 0; strand < 3; strand++) {
-    const centers: number[] = [], vertices: number[] = [], uvs: number[] = [], indices: number[] = [];
-    const segments = innerWidth < 701 ? 460 : 800;
+  // Three translucent surfaces and interlaced hairlines share one continuous route.
+  // All geometry is generated once; the shader handles motion and chapter changes.
+  const fineCount = innerWidth < 701 ? 4 : 6;
+  for (let strand = 0; strand < 3 + fineCount; strand++) {
+    const fine = strand >= 3, fineIndex = strand - 3;
+    const centers: number[] = [], vertices: number[] = [], uvs: number[] = [], fibers: number[] = [], indices: number[] = [];
+    const segments = innerWidth < 701 ? 400 : 700;
     for (let i = 0; i <= segments; i++) {
-      const t = i / segments, center = route.getPointAt(t), phase = t * Math.PI * 7 + strand * Math.PI * 2 / 3;
-      const radius = 6.5 + Math.sin(t * Math.PI * 12) * 1.6;
-      for (const side of [-1, 1]) { const a = phase + side * .115;vertices.push(center.x + Math.cos(a) * radius, center.y + Math.sin(a) * radius, center.z);uvs.push(t, (side + 1) / 2);centers.push(center.x,center.y,center.z); }
+      const t = i / segments, center = route.getPointAt(t);
+      const phase = t * Math.PI * 7 + (fine ? (fineIndex + .5) * Math.PI * 2 / fineCount + Math.sin(t * 38 + strand) * .14 : strand * Math.PI * 2 / 3);
+      const radius = fine ? 5.3 + Math.sin(t * Math.PI * 16 + strand) * .5 : 6.5 + Math.sin(t * Math.PI * 12) * 1.3;
+      const halfWidth = fine ? .008 : .06;
+      for (const side of [-1, 1]) { const a = phase + side * halfWidth;vertices.push(center.x + Math.cos(a) * radius, center.y + Math.sin(a) * radius, center.z);uvs.push(t, (side + 1) / 2);fibers.push(fine ? 1 : 0);centers.push(center.x,center.y,center.z); }
       if (i < segments) { const n = i * 2;indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
     }
-    const g = geometry(new THREE.BufferGeometry());g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));g.setAttribute('aCenter', new THREE.Float32BufferAttribute(centers, 3));g.setIndex(indices);scene.add(new THREE.Mesh(g, ribbonMaterial));
+    const g = geometry(new THREE.BufferGeometry());g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));g.setAttribute('aCenter', new THREE.Float32BufferAttribute(centers, 3));g.setAttribute('aFiber', new THREE.Float32BufferAttribute(fibers, 1));g.setIndex(indices);scene.add(new THREE.Mesh(g, ribbonMaterial));
   }
   const lineMaterial = material(new THREE.LineBasicMaterial({ color, transparent: true, opacity: .26, depthWrite: false }));
   const stations: { group: THREE.Group; index: number }[] = [];
@@ -100,6 +105,7 @@ export function createBackdrop(parent: AbortSignal): void {
   const introScope = document.querySelector<HTMLElement>('.signal-scope');
   const audio = document.querySelector<HTMLAudioElement>('#minuet-audio');
   const chapterColors = ['#315bff','#526cff','#315bff','#6384df','#c4e6b7','#c86b65','#a5bbff','#768eb4','#a5bbff'];
+  const chapterAccents = ['#526cff','#8b58c9','#377e77','#5678cf','#b4d17b','#c65a80','#7968c9','#547db6','#677acb'];
   let offsets: number[] = [], frame = 0, lastY = scrollY, current = 0, target = 0, energy = 0, dead = false, pointerUntil = 0, pulseStart = -10000, lastFrame = 0, elapsed = 0, form = 0, previewChapter = -1;
   const pointer = new THREE.Vector2(), pointerTarget = new THREE.Vector2(), eye = new THREE.Vector3(), ahead = new THREE.Vector3();
   workLinks.forEach((link, index) => {
@@ -138,7 +144,7 @@ export function createBackdrop(parent: AbortSignal): void {
     const chapter = Math.min(8, Math.floor(current * stops.length));
     const scopePhase = Number(introScope?.dataset.phase ?? 0);
     const activeForm = chapter === 1 ? previewChapter >= 0 ? previewChapter : Math.min(5,Math.max(2,scopePhase+2)) : chapter;
-    color.set(chapterColors[activeForm]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);
+    color.set(chapterColors[activeForm]);accent.set(chapterAccents[activeForm]);uniforms.uColor.value.lerp(color,.08);uniforms.uAccent.value.lerp(accent,.08);lineMaterial.color.copy(uniforms.uColor.value);
     const quiet = chapter === 2 || chapter === 3 ? .72 : chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
     form += (activeForm-form)*.055;uniforms.uForm.value=form;
     uniforms.uIntro.value += ((chapter === 1 ? 1 : 0)-uniforms.uIntro.value)*.07;
