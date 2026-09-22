@@ -184,3 +184,27 @@ body,body *{font-weight:700!important}
 }
 .lens-image img{width:auto;max-width:100%;max-height:48svh;object-fit:contain}
 .is-zoomed .lens-image img{max-width:none;max-height:none}
+
+/* The closing composition fits a viewport without shrinking its touch targets. */
+.contact-scene{padding-top:24px;padding-bottom:0}
+.contact-scene .section-rule{padding-top:12px}
+.contact-scene .closing-trace{height:30px;margin:16px 0 0}
+.contact-scene h2{font-size:min(15vw,22svh);margin:20px 0 22px}
+.contact-scene .contact-bottom{gap:5vw;margin-bottom:18px}
+.contact-scene .contact-links{gap:6px 24px}
+.contact-scene .contact-links a{min-height:44px}
+.contact-scene .footer-baseline{min-height:64px;padding-top:8px;padding-bottom:8px}
+.contact-scene .frog-signature{height:52px;bottom:6px}
+@media(max-width:700px){
+ .contact-scene{padding-top:16px}
+ .contact-scene .section-rule{font-size:10px;gap:12px;padding-top:10px}
+ .contact-scene .closing-trace{height:18px;margin:10px 0 0}
+ .contact-scene h2{font-size:min(25vw,15svh);margin:14px 0 16px}
+ .contact-scene .contact-bottom{gap:10px;margin-bottom:12px}
+ .contact-scene .contact-bottom>p{font-size:14px;line-height:1.45}
+ .contact-scene .contact-links{gap:3px 18px}
+ .contact-scene .footer-baseline{min-height:62px;gap:0;font-size:10px;padding:5px 82px 5px 0}
+ .contact-scene .footer-baseline>a:not(.frog-signature){min-height:36px}
+ .contact-scene .frog-signature{height:48px;bottom:6px}
+ .journey-route[data-chapter="8"]{display:none}
+}
