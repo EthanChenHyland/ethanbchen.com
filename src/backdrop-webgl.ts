@@ -16,11 +16,11 @@ export function createBackdrop(parent: AbortSignal): void {
   const material = <T extends THREE.Material>(m: T): T => { materials.push(m);return m; };
   const route = new THREE.CatmullRomCurve3(Array.from({ length: 37 }, (_, i) => new THREE.Vector3(Math.sin(i * .49) * 5, Math.cos(i * .36) * 3, 18 - i * 9)), false, 'catmullrom', .35);
   const color = new THREE.Color('#315bff');
-  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
+  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uForm: { value: 0 }, uScoreTime: { value: 0 }, uPlaying: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
   const ribbonMaterial = material(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms,
     vertexShader: `
       varying vec2 vUv;varying float vDepth;
-      uniform float uTime;uniform float uEnergy;uniform float uResolve;uniform vec2 uPointer;
+      uniform float uTime;uniform float uEnergy;uniform float uResolve;uniform float uForm;uniform float uScoreTime;uniform float uPlaying;uniform vec2 uPointer;
       uniform float uPressure;uniform float uPulse;uniform float uPulseAge;uniform float uHead;
       attribute vec3 aCenter;
       void main(){
@@ -31,6 +31,16 @@ export function createBackdrop(parent: AbortSignal): void {
         p.x+=sin(uv.x*80.)*uEnergy*.12;
         p.x+=sin(uv.x*42.+uTime*.75)*(.9+uEnergy*.32);
         p.y+=cos(uv.x*35.-uTime*.58)*(.65+uEnergy*.24);
+        float contract=1.-smoothstep(.2,1.,abs(uForm-2.));
+        float context=1.-smoothstep(.2,1.,abs(uForm-3.));
+        float score=1.-smoothstep(.2,1.,abs(uForm-4.));
+        float feeling=1.-smoothstep(.2,1.,abs(uForm-5.));
+        float lab=1.-smoothstep(.2,1.,abs(uForm-6.));
+        p.x+=contract*floor(sin(uv.x*27.)*2.)*.24;
+        p.y+=context*sin(uv.x*56.+uTime*.4)*.3;
+        p.y+=score*sin(uv.x*150.-uScoreTime*10.)*(.15+uPlaying*.48);
+        p.x+=feeling*sin(uv.x*93.+uTime*1.1)*.55;
+        p.y+=lab*sin(uv.x*125.-uTime*1.4)*.3;
         vec4 view=modelViewMatrix*vec4(p,1.);vDepth=-view.z;
         vec4 clip=projectionMatrix*view;
         vec2 delta=uPointer-clip.xy/max(clip.w,.01);
@@ -84,7 +94,9 @@ export function createBackdrop(parent: AbortSignal): void {
 
   const links = [...nav.querySelectorAll<HTMLAnchorElement>('a')], position = nav.querySelector('.journey-position')!;
   const sections = stops.map(id => document.getElementById(id)!);
-  let offsets: number[] = [], frame = 0, lastY = scrollY, current = 0, target = 0, energy = 0, dead = false, pointerUntil = 0, pulseStart = -10000, lastFrame = 0, elapsed = 0;
+  const audio = document.querySelector<HTMLAudioElement>('#minuet-audio');
+  const chapterColors = ['#315bff','#526cff','#315bff','#6384df','#c4e6b7','#c86b65','#a5bbff','#768eb4','#a5bbff'];
+  let offsets: number[] = [], frame = 0, lastY = scrollY, current = 0, target = 0, energy = 0, dead = false, pointerUntil = 0, pulseStart = -10000, lastFrame = 0, elapsed = 0, form = 0;
   const pointer = new THREE.Vector2(), pointerTarget = new THREE.Vector2(), eye = new THREE.Vector3(), ahead = new THREE.Vector3();
   function measure() { offsets = sections.map(section => section.getBoundingClientRect().top + scrollY);updateTarget(); }
   function updateTarget() {
@@ -94,7 +106,7 @@ export function createBackdrop(parent: AbortSignal): void {
     target = Math.min(.96, (chapter + fraction) / stops.length);
     links.forEach((link,i) => { if (i === chapter) link.setAttribute('aria-current','location');else link.removeAttribute('aria-current'); });
     chapterSelect.value = stops[chapter];
-    position.textContent = `${String(chapter).padStart(2,'0')} / ${names[chapter]}`;nav.dataset.chapter = String(chapter);wake();
+    position.textContent = `${String(chapter).padStart(2,'0')} / ${names[chapter]}`;nav.dataset.chapter = String(chapter);document.body.dataset.chapter = String(chapter);wake();
   }
   function draw(now: number) {
     frame = 0;if (dead || document.hidden) return;
@@ -112,9 +124,11 @@ export function createBackdrop(parent: AbortSignal): void {
     uniforms.uPointer.value.copy(pointer);
     current += (target-current)*.075;energy *= .9;pointer.lerp(pointerTarget,.07);
     const chapter = Math.min(8, Math.floor(current * stops.length));
-    const dark = [4,6,8].includes(chapter);
-    color.set(dark ? '#a5bbff' : chapter === 5 ? '#5664bc' : '#315bff');uniforms.uColor.value.lerp(color,.1);lineMaterial.color.copy(uniforms.uColor.value);
-    const quiet = chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
+    color.set(chapterColors[chapter]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);
+    const quiet = chapter === 2 || chapter === 3 ? .72 : chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
+    form += (chapter-form)*.055;uniforms.uForm.value=form;
+    uniforms.uScoreTime.value=audio?.currentTime ?? 0;
+    uniforms.uPlaying.value += ((audio && !audio.paused ? 1 : 0)-uniforms.uPlaying.value)*.12;
     uniforms.uResolve.value=THREE.MathUtils.smoothstep(current*9,8.45,8.9) * .65;
     uniforms.uQuiet.value=quiet;lineMaterial.opacity=.25*quiet;
     uniforms.uHead.value=current;uniforms.uEnergy.value=energy;
@@ -127,13 +141,14 @@ export function createBackdrop(parent: AbortSignal): void {
   function wake(){if(!frame&&!dead&&!document.hidden)frame=requestAnimationFrame(draw);}
   function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<701?1:1.25));renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<701?72:58;camera.updateProjectionMatrix();measure();}
   const observer=new ResizeObserver(measure);sections.forEach(section=>observer.observe(section));
-  function dispose(){if(dead)return;dead=true;lifetime.abort();parent.removeEventListener('abort',dispose);observer.disconnect();cancelAnimationFrame(frame);geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();nav.remove();document.body.classList.remove('has-backdrop');}
-  window.addEventListener('scroll',()=>{energy=Math.min(2,energy+Math.abs(scrollY-lastY)/180);lastY=scrollY;updateTarget();},{passive:true,signal});
+  function dispose(){if(dead)return;dead=true;lifetime.abort();parent.removeEventListener('abort',dispose);observer.disconnect();cancelAnimationFrame(frame);geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();nav.remove();document.body.classList.remove('has-backdrop');delete document.body.dataset.chapter;}
+  window.addEventListener('scroll',()=>{const delta=scrollY-lastY;energy=Math.min(2,energy+Math.abs(delta)/180);if(Math.abs(delta)>3)nav.dataset.direction=delta>0?'down':'up';lastY=scrollY;updateTarget();},{passive:true,signal});
   window.addEventListener('pointermove',event=>{if(event.pointerType==='touch')return;pointerTarget.set(event.clientX/innerWidth*2-1,1-event.clientY/innerHeight*2);pointerUntil=performance.now()+450;wake();},{passive:true,signal});
   document.addEventListener('click',event=>{
     if (!(event.target instanceof Element) || !event.target.closest('.disturb-identity,[data-field],[data-label],[data-channel],.repo-object,.bench-shuffle,.fold-story')) return;
     pulseStart=elapsed;wake();
   },{signal});
+  audio?.addEventListener('play',wake,{signal});audio?.addEventListener('pause',wake,{signal});
   window.addEventListener('resize',resize,{passive:true,signal});document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;lastFrame=0;}else wake();},{signal});
   renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();dispose();},{signal});parent.addEventListener('abort',dispose,{once:true});document.body.classList.add('has-backdrop');resize();current=target;
 }
