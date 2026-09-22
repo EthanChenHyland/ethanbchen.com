@@ -1,0 +1,15 @@
+node_modules/
+dist/
+qa/
+.DS_Store
+tmp/
+.env
+.env.*
+*.log
+research/*
+!research/asset-provenance.md
+!research/resume-content.md
+!research/homepage-direction.md
+!research/creative-reference-study.md
+!research/piano-evidence-audit.md
+!research/piano-chroma.csv
