@@ -1,0 +1,4 @@
+Preserved static build of EthanChenPond, built 2026-09-11 for /github.
+Copied read-only from /Users/ethius/VSCode/EthanChenPond/outputs/cloudflare-static.
+The original repository and its deployment were not modified.
+This is an independent route; its JS and media are not loaded by the homepage.
