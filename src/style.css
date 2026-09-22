@@ -204,6 +204,7 @@ body,body *{font-weight:700!important}
 .journey-route[data-chapter="5"]{color:#ad514f;mix-blend-mode:normal}
 .journey-route[data-chapter="5"] b{background:#e8e3d9}
 body[data-chapter="2"] .scene-backdrop{opacity:.46}
+body[data-chapter="1"] .scene-backdrop{opacity:.55}
 body[data-chapter="3"] .scene-backdrop{opacity:.2}
 body[data-chapter="4"] .scene-backdrop{opacity:.38}
 body[data-chapter="5"] .scene-backdrop{opacity:.38}
@@ -226,6 +227,40 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
  .journey-route{transition:opacity .25s,transform .25s}
  .journey-route[data-direction="down"]{opacity:0;transform:translateY(130%);pointer-events:none}
 }
+
+/* The four projects pass through one live input-to-outcome instrument. */
+.signal-scope{margin-top:30px;border-top:1px solid var(--blue);border-bottom:1px solid var(--line);width:100%;max-width:410px;color:var(--ink)}
+.scope-top,.scope-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:10px}
+.scope-top{padding-top:12px;color:var(--blue)}
+.scope-counter{white-space:nowrap}
+.scope-stage{height:145px;position:relative;overflow:hidden}
+.scope-stage svg{position:absolute;inset:7px 0 auto;width:100%;height:102px;overflow:visible;pointer-events:none}
+.scope-stage path{fill:none;stroke:var(--blue);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;stroke-dasharray:750;stroke-dashoffset:750;transition:opacity .45s,stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+.signal-scope[data-phase="0"] [data-shape="0"],.signal-scope[data-phase="1"] [data-shape="1"],.signal-scope[data-phase="2"] [data-shape="2"],.signal-scope[data-phase="3"] [data-shape="3"]{opacity:.75;stroke-dashoffset:0}
+.scope-pair{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:clamp(16px,1.55vw,23px);line-height:1.25;letter-spacing:-.04em;white-space:nowrap}
+.scope-pair>span{background:var(--paper)}
+.scope-pair>span:nth-child(2){color:var(--blue);padding:0 4px}
+.scope-output{color:var(--blue);text-align:right}
+.scope-bottom{padding:17px 0 12px;color:var(--muted)}
+.scope-track{display:block;width:96px;height:2px;background:#315bff33;flex:none}
+.scope-track i{display:block;width:100%;height:100%;background:var(--blue);transform:scaleX(var(--scope-progress,0));transform-origin:left}
+.work-index a{transition:color .25s,background .25s}
+.work-index a.is-current{color:var(--blue);background:#315bff0c}
+.work-index a.is-current>span:first-child{color:var(--blue)}
+@media(prefers-reduced-motion:no-preference){.has-backdrop .intro{height:210svh}.has-backdrop .intro-layout{top:18svh;opacity:clamp(0,calc((.86 - var(--scope-progress,0))*12),1)}}
+@media(max-width:700px){
+ body[data-chapter="1"] .scene-backdrop{opacity:.42}
+ .signal-scope{margin-top:22px;max-width:none}
+ .scope-top,.scope-bottom{font-size:9px}
+ .scope-stage{height:115px}
+ .scope-stage svg{height:75px}
+ .scope-pair{font-size:clamp(15px,4vw,19px)}
+ .scope-bottom{padding:12px 0 10px}
+ .scope-track{width:60px}
+}
+@media(max-width:700px) and (prefers-reduced-motion:no-preference){.has-backdrop .intro{height:190svh}.has-backdrop .intro-layout{top:10svh}.has-backdrop .intro .work-index{background:var(--paper);z-index:4}}
+@media(max-width:360px){.scope-top,.scope-bottom{font-size:8px}.scope-stage{height:102px}.scope-stage svg{height:65px}}
+@media(prefers-reduced-motion:reduce){.scope-stage path{transition:none;stroke-dashoffset:0}.work-index a{transition:none}}
 
 /* The closing composition fits a viewport without shrinking its touch targets. */
 .contact-scene{padding-top:24px;padding-bottom:0}

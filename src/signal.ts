@@ -10,9 +10,48 @@ export function setupSignal(signal: AbortSignal): void {
   const contact = document.querySelector<HTMLElement>('.contact-scene');
   const pipeline = document.querySelector<HTMLOListElement>('.evaluation-path');
   const steps = [...document.querySelectorAll<HTMLLIElement>('.evaluation-path li')];
+  const intro = document.querySelector<HTMLElement>('.intro');
+  const scope = intro?.querySelector<HTMLElement>('.signal-scope');
+  const scopeInput = scope?.querySelector<HTMLElement>('.scope-input');
+  const scopeOutput = scope?.querySelector<HTMLElement>('.scope-output');
+  const scopeCounter = scope?.querySelector<HTMLElement>('.scope-counter');
+  const scopeInstruction = scope?.querySelector<HTMLElement>('.scope-instruction');
+  const workLinks = [...document.querySelectorAll<HTMLAnchorElement>('.work-index a')];
+  const transformations = [['REPORT','CONTRACT'],['SCREEN','CONTEXT'],['SCORE','EVIDENCE'],['STORY','FEELING']];
+  let activePhase = -1;
+  let previewPhase = -1;
   let frame = 0;
+  const setScope = (index: number) => {
+    if (!scope || !scopeInput || !scopeOutput || !scopeCounter || activePhase === index) return;
+    activePhase = index;
+    scope.dataset.phase = String(index);
+    scopeInput.textContent = transformations[index][0];
+    scopeOutput.textContent = transformations[index][1];
+    scopeCounter.textContent = `${String(index + 1).padStart(2, '0')} / 04`;
+    workLinks.forEach((link, i) => link.classList.toggle('is-current', i === index));
+    if (!reduced.matches) {
+      const pair = scope.querySelector('.scope-pair');
+      pair?.getAnimations().forEach(animation => animation.cancel());
+      pair?.animate([{ opacity: .15, transform: 'translateY(14px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 350, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+  };
+  const updateIntro = () => {
+    if (!intro || !scope) return;
+    const rect = intro.getBoundingClientRect();
+    const travel = Math.max(1, rect.height - innerHeight);
+    const progress = reduced.matches ? 0 : Math.max(0, Math.min(1, -rect.top / travel));
+    intro.style.setProperty('--scope-progress', String(progress));
+    setScope(previewPhase >= 0 ? previewPhase : Math.min(3, Math.floor(progress * 5)));
+  };
+  workLinks.forEach((link, index) => {
+    link.addEventListener('pointerenter', () => { previewPhase = index;updateIntro(); }, { signal });
+    link.addEventListener('pointerleave', () => { if (document.activeElement !== link) { previewPhase = -1;updateIntro(); } }, { signal });
+    link.addEventListener('focus', () => { previewPhase = index;updateIntro(); }, { signal });
+    link.addEventListener('blur', () => { previewPhase = -1;updateIntro(); }, { signal });
+  });
   const draw = () => {
     frame = 0;
+    updateIntro();
     if (reduced.matches) {
       heroPaths.forEach(path => path.style.strokeDashoffset = '0');
       contact?.style.setProperty('--resolve', '1');
@@ -42,6 +81,7 @@ export function setupSignal(signal: AbortSignal): void {
   const preference = () => {
     cancelAnimationFrame(frame);
     frame = 0;
+    if (scopeInstruction) scopeInstruction.textContent = reduced.matches ? 'FOCUS THE LINKS TO PREVIEW' : 'SCROLL / PREVIEW THE INPUTS';
     if (reduced.matches) draw();
     else schedule();
   };
