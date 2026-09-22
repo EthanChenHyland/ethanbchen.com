@@ -1,0 +1,46 @@
+# Asset provenance
+
+Recorded 2026-09-19. Media origins below are documented in `research/homepage-direction.md`; resume evidence is documented in `research/resume-content.md`. This inventory preserves that existing research rather than claiming a new upstream audit. Exact upstream revisions are included only where recorded.
+
+## Media and captured evidence
+
+All destination paths below are relative to the repository root.
+
+| Destination | Actual source recorded in existing research | Treatment / limits |
+| --- | --- | --- |
+| `public/media/frog.svg` | Existing photographic ASCII frog in the profile project's `assets/demos` | Reused authentic asset; exact upstream filename/revision not recorded. |
+| `public/media/clarity-overlay.png` | Clarity repository, `docs/overlay.png` | Actual application interface, not a recreated mockup. |
+| `public/media/avoid-love.jpg` | avoid.love repository, `public/og.jpg` | Existing project artwork. |
+| `public/media/minuet.wav` | Existing Pond captured synthetic Minuet audio | First 12 seconds of tracked MIDI, synthesized locally with a harmonic tone envelope; no recorded human performance. |
+| `public/data/piano-notes.json` | Profile `assets/demos` captured output from the Piano MIR run | Known-score note evidence. |
+| `public/data/piano-provenance.json` | Same captured output | Identifies `https://github.com/EthanChenHyland/PianoMirRustPublic`, commit `a4cedc91875f4ccb697f366cea6e1c4664ec36d1`, and input/interpretation. |
+| `public/data/piano-report.md` | Same captured output | Same-source, score-aligned verification; not a pianist's skill grade or reliable blind transcription. |
+| `research/piano-chroma.csv` | Captured chroma evidence identified by the existing research | Input to the local visualization generator; measurements are not fabricated. |
+| `public/media/chroma.svg` | Derived from `research/piano-chroma.csv` by `scripts/build-evidence.py` | Max-pooled time windows, with duration read from `public/media/minuet.wav`. |
+| Inline score graphic in `index.html` | Derived from `public/data/piano-notes.json` by `scripts/build-evidence.py` | Notes positioned against the same audio duration; the script also updates time-axis ticks. |
+| `public/github/` | Existing EthanChenPond static output | Preserved dedicated Pond experience; no per-file upstream revision inventory was recorded in the research. |
+
+The research identifies the Clarity and avoid.love repositories as `EthanChenHyland/clarity` and `EthanChenHyland/avoid.love` through the homepage's project references. It does not record a pinned commit for their image assets. Procedural signal-study graphics are implemented locally in `src/signal-shapes.ts` and `src/signal-shaders.ts`, not sourced photographs.
+
+## Resume and contact content
+
+- `public/resume.pdf`: unmodified copy of `/Users/ethius/Desktop/Resume : Intern Stuff/Ethan_B_Chen_Resume_Tech.pdf`, the current supplied tech resume. Copy verification recorded SHA-256 `0b51b6c208612f5327beb777e015d8ef25040540b0455304aea15663bd0ec30a` (86,519 bytes).
+- `/Users/ethius/Desktop/Resume : Intern Stuff/Canva Resume New.pdf`: corroborates internship dates/contact text and supplies piano, chess, and clarinet details. It is not the downloadable resume.
+- `research/resume-content.md` records page-level factual provenance and exact email/LinkedIn targets. These were checked against supplied documents, not live accounts or employers. Earlier “verification pending” notes in `research/homepage-direction.md` predate that work.
+- Replace the tech PDF at the stable `public/resume.pdf` path when an updated version is supplied, then update these source/hash notes. See `README.md` for the workflow. Homepage copy omits phone and home address; the download retains the source PDF's contents.
+
+## Fonts and retained licenses
+
+Each deployed WOFF2 was compared byte-for-byte with the installed package file below. All three installed packages report version **5.3.0** and license **OFL-1.1**. The license files are copied unmodified from each package's `LICENSE`, including its copyright notices.
+
+| Deployed file | Exact source under `node_modules/` | Retained license |
+| --- | --- | --- |
+| `public/fonts/manrope.woff2` | `@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2` | `public/fonts/licenses/manrope-LICENSE.txt` |
+| `public/fonts/instrument-serif.woff2` | `@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2` | `public/fonts/licenses/instrument-serif-LICENSE.txt` |
+| `public/fonts/instrument-serif-italic.woff2` | `@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2` | `public/fonts/licenses/instrument-serif-LICENSE.txt` |
+| `public/fonts/plex-mono.woff2` | `@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2` | `public/fonts/licenses/ibm-plex-mono-LICENSE.txt` |
+
+Copyright notices identify the Manrope Project Authors (2019), Instrument Serif Project Authors (2022), and IBM Corp. (2017), respectively. These font licenses apply to their fonts; this inventory does not assert a blanket license for the other site assets.
+
+## Clarity replacement — 2026-09-20
+`public/media/clarity-overlay.png` now shows the current renderer’s empty state, captured at 1328×870 from an isolated local browser preview. HTML, CSS, and icons were copied from `/Users/ethius/VSCode/clarity/renderer`; the minimal initialization reproduces the source’s startup message, icons, macOS shortcuts, and unconfigured prep fields. Preview source is in `research/clarity-preview`. Updated 2026-09-21: recaptured with a transparent browser surface around the actual toolbar and panel. Only the panel and toolbar surfaces are made opaque for legibility; there is no baked-in desktop rectangle. The 1328×870 PNG retains RGBA transparency. The Three.js image uses an unlit, untone-mapped material to preserve the original interface colors. This is a source render, not a capture of the protected native window. No backend, credentials, conversations, microphone, or screen capture was connected. Installed Clarity content protection remained enabled.
