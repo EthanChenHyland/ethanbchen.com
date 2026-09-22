@@ -16,11 +16,11 @@ export function createBackdrop(parent: AbortSignal): void {
   const material = <T extends THREE.Material>(m: T): T => { materials.push(m);return m; };
   const route = new THREE.CatmullRomCurve3(Array.from({ length: 37 }, (_, i) => new THREE.Vector3(Math.sin(i * .49) * 5, Math.cos(i * .36) * 3, 18 - i * 9)), false, 'catmullrom', .35);
   const color = new THREE.Color('#315bff');
-  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uForm: { value: 0 }, uScoreTime: { value: 0 }, uPlaying: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
+  const uniforms = { uTime: { value: 0 }, uColor: { value: color.clone() }, uHead: { value: 0 }, uEnergy: { value: 0 }, uQuiet: { value: 1 }, uResolve: { value: 0 }, uForm: { value: 0 }, uIntro: { value: 0 }, uScoreTime: { value: 0 }, uPlaying: { value: 0 }, uPointer: { value: new THREE.Vector2(4, 4) }, uPressure: { value: 0 }, uPulse: { value: 0 }, uPulseAge: { value: 0 } };
   const ribbonMaterial = material(new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms,
     vertexShader: `
       varying vec2 vUv;varying float vDepth;
-      uniform float uTime;uniform float uEnergy;uniform float uResolve;uniform float uForm;uniform float uScoreTime;uniform float uPlaying;uniform vec2 uPointer;
+      uniform float uTime;uniform float uEnergy;uniform float uResolve;uniform float uForm;uniform float uIntro;uniform float uScoreTime;uniform float uPlaying;uniform vec2 uPointer;
       uniform float uPressure;uniform float uPulse;uniform float uPulseAge;uniform float uHead;
       attribute vec3 aCenter;
       void main(){
@@ -36,10 +36,12 @@ export function createBackdrop(parent: AbortSignal): void {
         float score=1.-smoothstep(.2,1.,abs(uForm-4.));
         float feeling=1.-smoothstep(.2,1.,abs(uForm-5.));
         float lab=1.-smoothstep(.2,1.,abs(uForm-6.));
-        p.x+=contract*floor(sin(uv.x*27.)*2.)*.24;
-        p.y+=context*sin(uv.x*56.+uTime*.4)*.3;
-        p.y+=score*sin(uv.x*150.-uScoreTime*10.)*(.15+uPlaying*.48);
-        p.x+=feeling*sin(uv.x*93.+uTime*1.1)*.55;
+        float width=1.+uIntro*(-.28*contract+.2*context-.18*score+.15*feeling);
+        p.xy=aCenter.xy+(p.xy-aCenter.xy)*width;
+        p.x+=contract*floor(sin(uv.x*27.)*2.)*(.24+uIntro*.45);
+        p.y+=context*sin(uv.x*56.+uTime*.4)*(.3+uIntro*.55);
+        p.y+=score*sin(uv.x*150.-uScoreTime*10.)*(.15+uPlaying*.48+uIntro*.42);
+        p.x+=feeling*sin(uv.x*93.+uTime*1.1)*(.55+uIntro*.75);
         p.y+=lab*sin(uv.x*125.-uTime*1.4)*.3;
         vec4 view=modelViewMatrix*vec4(p,1.);vDepth=-view.z;
         vec4 clip=projectionMatrix*view;
@@ -139,6 +141,7 @@ export function createBackdrop(parent: AbortSignal): void {
     color.set(chapterColors[activeForm]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);
     const quiet = chapter === 2 || chapter === 3 ? .72 : chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
     form += (activeForm-form)*.055;uniforms.uForm.value=form;
+    uniforms.uIntro.value += ((chapter === 1 ? 1 : 0)-uniforms.uIntro.value)*.07;
     uniforms.uScoreTime.value=audio?.currentTime ?? 0;
     uniforms.uPlaying.value += ((audio && !audio.paused ? 1 : 0)-uniforms.uPlaying.value)*.12;
     uniforms.uResolve.value=THREE.MathUtils.smoothstep(current*9,8.45,8.9) * .65;
