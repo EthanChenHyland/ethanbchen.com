@@ -49,6 +49,12 @@ Check the preview at desktop and narrow mobile widths, including keyboard naviga
 - `tests/` contains Node unit tests. Selected `research/` documents record design direction, content verification, and asset provenance; local screenshots, logs, and scratch files are not published.
 - `scripts/build-evidence.py` derives the chroma SVG and inline score drawing from captured piano evidence. It writes `public/media/chroma.svg` **and `index.html`**; it is a separate maintenance tool, not part of the npm build.
 
+## Deployment
+
+GitHub Pages builds and deploys `main` through `.github/workflows/deploy.yml`. Each deployment runs a clean dependency install, lint, tests, TypeScript validation, and a production build. Only `dist/` is uploaded. The repository Pages custom domain is `ethanbchen.com`; domain DNS is managed separately in Cloudflare.
+
+The apex DNS should use GitHub Pages' four A records (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`). Use DNS-only records while GitHub validates the domain and provisions HTTPS. Enable **Enforce HTTPS** in repository Pages settings after its certificate becomes available. Keep unrelated DNS records intact.
+
 ## Replace the resume
 
 `public/resume.pdf` is the current supplied tech resume, copied unmodified. Its stable public URL is `/resume.pdf`; keep that filename when a newer resume arrives.
