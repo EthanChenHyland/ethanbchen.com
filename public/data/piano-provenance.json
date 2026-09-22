@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/EthanChenHyland/PianoMirRustPublic",
+  "commit": "a4cedc91875f4ccb697f366cea6e1c4664ec36d1",
+  "input": "First 12 seconds of tracked Minuet MIDI, synthesized locally with a harmonic tone envelope. No recorded human performance.",
+  "final_result": {
+    "headline_status": "verified_aligned",
+    "headline_score": 94.78170120046046,
+    "headline_score_label": "Same-source score-aligned verification score",
+    "headline_score_source": "score_aligned_note_chroma_matcher",
+    "performance_grade_score": null,
+    "verification_score": 94.78170120046046,
+    "experimental_blind_score": 80.05144718027898,
+    "score_informed_match_score": 94.55913739555794,
+    "reliability_score": 80.26609966782799,
+    "interpretation": "Score-aligned note/chroma evidence verifies that the audio likely matches the known score; blind transcription remains unreliable and is shown only as experimental evidence.",
+    "caveats": [
+      "Score-informed evidence uses the known score, so it is not blind transcription."
+    ]
+  },
+  "note_score": 99.86,
+  "timing_score": 96.01,
+  "chroma_score": 66.95,
+  "missing_notes": 0
+}
