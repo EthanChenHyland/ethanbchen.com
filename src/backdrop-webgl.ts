@@ -94,10 +94,20 @@ export function createBackdrop(parent: AbortSignal): void {
 
   const links = [...nav.querySelectorAll<HTMLAnchorElement>('a')], position = nav.querySelector('.journey-position')!;
   const sections = stops.map(id => document.getElementById(id)!);
+  const workLinks = [...document.querySelectorAll<HTMLAnchorElement>('.work-index a')];
+  const introScope = document.querySelector<HTMLElement>('.signal-scope');
   const audio = document.querySelector<HTMLAudioElement>('#minuet-audio');
   const chapterColors = ['#315bff','#526cff','#315bff','#6384df','#c4e6b7','#c86b65','#a5bbff','#768eb4','#a5bbff'];
-  let offsets: number[] = [], frame = 0, lastY = scrollY, current = 0, target = 0, energy = 0, dead = false, pointerUntil = 0, pulseStart = -10000, lastFrame = 0, elapsed = 0, form = 0;
+  let offsets: number[] = [], frame = 0, lastY = scrollY, current = 0, target = 0, energy = 0, dead = false, pointerUntil = 0, pulseStart = -10000, lastFrame = 0, elapsed = 0, form = 0, previewChapter = -1;
   const pointer = new THREE.Vector2(), pointerTarget = new THREE.Vector2(), eye = new THREE.Vector3(), ahead = new THREE.Vector3();
+  workLinks.forEach((link, index) => {
+    const preview = () => { previewChapter = index + 2;pulseStart = elapsed;wake(); };
+    const release = () => { previewChapter = -1;wake(); };
+    link.addEventListener('pointerenter', preview, { signal });
+    link.addEventListener('pointerleave', () => { if (document.activeElement !== link) release(); }, { signal });
+    link.addEventListener('focus', preview, { signal });
+    link.addEventListener('blur', release, { signal });
+  });
   function measure() { offsets = sections.map(section => section.getBoundingClientRect().top + scrollY);updateTarget(); }
   function updateTarget() {
     let chapter = 0;for (let i = 0; i < offsets.length; i++) if (scrollY + innerHeight * .3 >= offsets[i]) chapter = i;
@@ -124,9 +134,11 @@ export function createBackdrop(parent: AbortSignal): void {
     uniforms.uPointer.value.copy(pointer);
     current += (target-current)*.075;energy *= .9;pointer.lerp(pointerTarget,.07);
     const chapter = Math.min(8, Math.floor(current * stops.length));
-    color.set(chapterColors[chapter]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);
+    const scopePhase = Number(introScope?.dataset.phase ?? 0);
+    const activeForm = chapter === 1 ? previewChapter >= 0 ? previewChapter : Math.min(5,Math.max(2,scopePhase+2)) : chapter;
+    color.set(chapterColors[activeForm]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);
     const quiet = chapter === 2 || chapter === 3 ? .72 : chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
-    form += (chapter-form)*.055;uniforms.uForm.value=form;
+    form += (activeForm-form)*.055;uniforms.uForm.value=form;
     uniforms.uScoreTime.value=audio?.currentTime ?? 0;
     uniforms.uPlaying.value += ((audio && !audio.paused ? 1 : 0)-uniforms.uPlaying.value)*.12;
     uniforms.uResolve.value=THREE.MathUtils.smoothstep(current*9,8.45,8.9) * .65;
