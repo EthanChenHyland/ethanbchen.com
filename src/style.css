@@ -157,7 +157,8 @@ body,body *{font-weight:700!important}
 
 /* Reading surfaces and a cinematic, inspectable source-image view. */
 :root{--muted:#53554e}
-.project-lens-launch{display:block;margin:18px 0 0 auto;min-height:48px;padding:12px 0;background:none;border:0;border-bottom:2px solid var(--blue);color:var(--blue)}
+.project-lens-launch{position:absolute;right:20px;bottom:18px;z-index:5;min-height:48px;padding:10px 16px;background:#f2efe8;border:1px solid #315bff;color:#173edf;box-shadow:6px 6px 0 #315bff44;transition:transform .25s,box-shadow .25s}
+.project-lens-launch:hover,.project-lens-launch:focus-visible{transform:translate(-3px,-3px);box-shadow:9px 9px 0 #315bff55}
 .project-lens{width:min(1180px,94vw);max-width:none;max-height:92svh;padding:28px;border:1px solid #aebdfc;background:#e5eaff;color:#15234b;overflow:auto;box-shadow:0 30px 100px #0008}
 .project-lens::backdrop{background:#101729e8;backdrop-filter:blur(12px)}
 .project-lens header{display:flex;justify-content:space-between;gap:20px;align-items:start}.project-lens h2{font-size:clamp(40px,6vw,80px);margin:12px 0 24px}
@@ -184,6 +185,46 @@ body,body *{font-weight:700!important}
 }
 .lens-image img{width:auto;max-width:100%;max-height:48svh;object-fit:contain}
 .is-zoomed .lens-image img{max-width:none;max-height:none}
+
+/* Four materials, one continuous journey: each project changes the surrounding light. */
+.prompt-scene,.clarity-scene,.piano-scene,.avoid-scene{overflow:clip;isolation:isolate}
+.prompt-scene::before,.clarity-scene::before,.piano-scene::before,.avoid-scene::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none}
+.prompt-scene::before{background:radial-gradient(ellipse 52vw 48vw at 84% 30%,#b9ffb32e,transparent 74%),repeating-linear-gradient(90deg,transparent 0 7vw,#ffffff08 7vw calc(7vw + 1px))}
+.clarity-scene::before{background:radial-gradient(ellipse 58vw 58vw at 87% 48%,#668dff25,transparent 75%),linear-gradient(125deg,transparent 45%,#315bff0b 60%,transparent 82%)}
+.piano-scene::before{background:radial-gradient(ellipse 58vw 44vw at 76% 45%,#c4e6b726,transparent 73%),repeating-linear-gradient(0deg,transparent 0 59px,#c4e6b70b 59px 60px)}
+.avoid-scene::before{background:radial-gradient(ellipse 65vw 55vw at 80% 42%,#c86b653b,transparent 76%),radial-gradient(ellipse 45vw 45vw at 12% 82%,#75876b22,transparent 75%)}
+.prompt-scene::after,.clarity-scene::after,.piano-scene::after,.avoid-scene::after{position:absolute;right:-.035em;top:45px;z-index:0;font:700 clamp(180px,31vw,520px)/.7 Instrument,Georgia,serif;letter-spacing:-.1em;pointer-events:none;opacity:.085}
+.prompt-scene::after{content:'01';color:#fff}.clarity-scene::after{content:'02';color:#315bff}.piano-scene::after{content:'03';color:#c4e6b7}.avoid-scene::after{content:'04';color:#992d2c}
+.clarity-scene .overlay-mat{background:#e6eaf3;box-shadow:inset 0 0 0 1px #315bff33}
+.clarity-scene .overlay-mat:before{display:none}
+.overlay-mat:has(.gpu-media-ready),.overlay-mat.world-ready{background:#e6eaf3}
+.clarity-image img{filter:drop-shadow(0 18px 24px #10172942)}
+.clarity-image .volume-label{background:#e6eaf3;color:#14254b}
+.journey-route[data-chapter="5"]{color:#ad514f;mix-blend-mode:normal}
+.journey-route[data-chapter="5"] b{background:#e8e3d9}
+body[data-chapter="2"] .scene-backdrop{opacity:.46}
+body[data-chapter="3"] .scene-backdrop{opacity:.2}
+body[data-chapter="4"] .scene-backdrop{opacity:.38}
+body[data-chapter="5"] .scene-backdrop{opacity:.38}
+body[data-chapter="7"] .scene-backdrop{opacity:.35}
+body[data-chapter="8"] .scene-backdrop{opacity:.5}
+@media(prefers-reduced-motion:no-preference){.scene-backdrop{transition:opacity .7s}}
+@supports(animation-timeline:view()){
+ @media(prefers-reduced-motion:no-preference){
+  .prompt-scene::before,.clarity-scene::before,.piano-scene::before,.avoid-scene::before{animation:chapter-light linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+  .prompt-scene::after,.clarity-scene::after,.piano-scene::after,.avoid-scene::after{animation:chapter-figure linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+  @keyframes chapter-light{0%,100%{opacity:.2;transform:translateY(6%)}35%,65%{opacity:1;transform:translateY(0)}}
+  @keyframes chapter-figure{0%{transform:translateY(15vh) rotate(-8deg)}100%{transform:translateY(-12vh) rotate(7deg)}}
+ }
+}
+@media(max-width:700px){
+ .prompt-scene::after,.clarity-scene::after,.piano-scene::after,.avoid-scene::after{font-size:48vw;top:80px;right:4vw;opacity:.06}
+ .project-lens-launch{right:13px;bottom:13px;min-height:44px;font-size:10px;padding:8px 10px}
+ .journey-route{right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+ .journey-select{width:133px;padding:8px 20px 8px 7px;background:#f2efe8f2;backdrop-filter:blur(12px);box-shadow:0 4px 18px #10172925}
+ .journey-route{transition:opacity .25s,transform .25s}
+ .journey-route[data-direction="down"]{opacity:0;transform:translateY(130%);pointer-events:none}
+}
 
 /* The closing composition fits a viewport without shrinking its touch targets. */
 .contact-scene{padding-top:24px;padding-bottom:0}
