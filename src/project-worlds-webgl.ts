@@ -25,6 +25,8 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
     renderer.domElement.className = 'project-world-canvas';renderer.domElement.setAttribute('aria-hidden', 'true');document.body.append(renderer.domElement);
     release.push(() => { renderer.dispose();renderer.domElement.remove(); });
+    const labelLayer = document.createElement('div');labelLayer.className = 'project-world-labels';labelLayer.setAttribute('aria-hidden', 'true');document.body.append(labelLayer);
+    release.push(() => labelLayer.remove());
     renderer.setClearColor(0, 0);renderer.setScissorTest(true);
     renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault();dispose(); }, { signal });
     const camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
@@ -76,7 +78,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     const lineMaterial = ownMaterial(new THREE.LineBasicMaterial({ color: '#315bff', transparent: true, opacity: .5 }));
     function wire(points: THREE.Vector3[], group: THREE.Group, material = lineMaterial) { const g = ownGeometry(new THREE.BufferGeometry().setFromPoints(points));const line = new THREE.Line(g, material);group.add(line);return line; }
     function label(index: number, text: string, position: THREE.Vector3) {
-      const el = document.createElement('span');el.className = 'volume-label mono';el.textContent = text;views[index].append(el);
+      const el = document.createElement('span');el.className = `volume-label mono ${['schema-label', 'context-label', 'music-label'][index]}`;el.textContent = text;labelLayer.append(el);
       scenes[index].labels.push({ el, position });release.push(() => el.remove());return el;
     }
     // Six specimen planes: changing the DOM contract lifts its corresponding plane.
@@ -97,7 +99,11 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     const schemaTraceGeometry = ownGeometry(new THREE.BufferGeometry());
     const schemaTrace = new THREE.Line(schemaTraceGeometry, ownMaterial(new THREE.LineBasicMaterial({ color: '#315bff' })));schema.group.add(schemaTrace);
     views[0].closest('figure')!.querySelector('input')!.addEventListener('input', event => { schema.targetDepth = Number((event.target as HTMLInputElement).value);wake(); }, { signal });
-    document.querySelectorAll<HTMLButtonElement>('[data-field]').forEach((button, i) => button.addEventListener('click', () => { schema.selected = i;wake(); }, { signal }));
+    const schemaStatus = views[0].closest('figure')!.querySelector<HTMLElement>('.volume-status')!;
+    const schemaButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-field]')];
+    const updateSchemaStatus = (i: number) => { schemaStatus.textContent = `SELECTED / 0${i + 1} ${schemaFields[i].replaceAll('_', ' ').toUpperCase()}`; };
+    updateSchemaStatus(0);
+    schemaButtons.forEach((button, i) => button.addEventListener('click', () => { schema.selected = i;schema.labels.forEach(({ el }, index) => el.classList.toggle('selected', index === i));updateSchemaStatus(i);wake(); }, { signal }));
 
     // The source-rendered application interface sits in front of two independent audio planes.
     const context = scenes[1], contextPlanes: THREE.Mesh[] = [], channelWaves: THREE.Line[] = [];
@@ -193,6 +199,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
       if (lastFrame && now - lastFrame < interval - 1) { wake();return; }
       elapsed += lastFrame ? Math.min((now - lastFrame) / 1000, .1) : 0;lastFrame = now;
       let any = false;
+      scenes.forEach(world => world.labels.forEach(({ el }) => { el.hidden = true; }));
       renderer.setScissorTest(false);renderer.clear();renderer.setScissorTest(true);
       scenes.forEach(world => {
         const r = world.view.getBoundingClientRect();if (r.bottom <= 0 || r.top >= innerHeight) return;any = true;
@@ -226,12 +233,12 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
           notes.forEach((note, i) => bars.setColorAt(i, color.set(world.time >= note.start && world.time <= note.start + note.duration ? '#ffffff' : '#c4e6b7')));if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
         }
         fit(r.width, r.height, world.index, passage(r.top, r.height));world.group.updateMatrixWorld(true);
-        const projected = new THREE.Vector3();world.labels.forEach(({ el, position }) => { projected.copy(position);world.group.localToWorld(projected);projected.project(camera);const inset = world.index === 1 ? 75 : 40;el.style.left = `${THREE.MathUtils.clamp((projected.x + 1) * .5 * r.width, inset, r.width - inset)}px`;el.style.top = `${(1 - projected.y) * .5 * r.height}px`; });
+        const projected = new THREE.Vector3();world.labels.forEach(({ el, position }) => { projected.copy(position);world.group.localToWorld(projected);projected.project(camera);const inset = Math.min(world.index === 1 ? 75 : 40, r.width / 4);el.style.left = `${r.left + THREE.MathUtils.clamp((projected.x + 1) * .5 * r.width, inset, r.width - inset)}px`;el.style.top = `${r.top + THREE.MathUtils.clamp((1 - projected.y) * .5 * r.height, 12, r.height - 12)}px`;el.hidden = false; });
         if (world.index === 1) {
           // Keep channel captions distinct even when depth collapses the planes.
-          let previousBottom = 8;
+          let previousBottom = r.top + 8;
           [...world.labels].sort((a, b) => parseFloat(a.el.style.top) - parseFloat(b.el.style.top)).forEach(({ el }) => {
-            const top = Math.max(previousBottom + 24, parseFloat(el.style.top));
+            const top = Math.min(r.bottom - 12, Math.max(previousBottom + 24, parseFloat(el.style.top)));
             el.style.top = `${top}px`;previousBottom = top;
           });
         }
