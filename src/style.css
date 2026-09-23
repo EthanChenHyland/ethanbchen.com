@@ -288,3 +288,11 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
 .project-world.is-hovering-object{cursor:pointer}.project-world.is-hovering-object:active{cursor:grabbing}.context-label.hovered{background:#315bff;color:white}.channel-controls button.is-preview{color:var(--blue)}.channel-controls button.is-preview .channel-icon{color:var(--blue)}
 .context-label.selected{background:#315bff;color:white}
 
+
+/* Editorial chapter entrances follow native scrolling and leave reduced motion static. */
+@supports(animation-timeline:view()){
+  @media(min-width:701px) and (prefers-reduced-motion:no-preference){
+    .prompt-scene>h2,.clarity-title-row h2,.piano-heading h2,.avoid-heading h2,.experiment-intro h2,.about-layout h2,.contact-scene>h2{animation:chapter-arrive linear both;animation-timeline:view();animation-range:entry 0% entry 70%}
+    @keyframes chapter-arrive{from{translate:0 5vw;opacity:.7}to{translate:0 0;opacity:1}}
+  }
+}
