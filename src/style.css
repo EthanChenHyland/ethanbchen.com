@@ -243,7 +243,7 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
 .work-index a{transition:color .25s,background .25s}
 .work-index a.is-current{color:var(--blue);background:#315bff0c}
 .work-index a.is-current>span:first-child{color:var(--blue)}
-@media(prefers-reduced-motion:no-preference){.has-backdrop .intro{height:210svh}.has-backdrop .intro-layout{top:18svh;opacity:clamp(0,calc((.86 - var(--scope-progress,0))*12),1)}}
+@media(prefers-reduced-motion:no-preference){.has-backdrop .intro{height:185svh}.has-backdrop .intro-layout{top:18svh}}
 @media(max-width:700px){
  body[data-chapter="1"] .scene-backdrop{opacity:.42}
  .signal-scope{margin-top:22px;max-width:none}
@@ -254,7 +254,7 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
  .scope-bottom{padding:12px 0 10px}
  .scope-track{width:60px}
 }
-@media(max-width:700px) and (prefers-reduced-motion:no-preference){.has-backdrop .intro{height:190svh}.has-backdrop .intro-layout{top:10svh}.has-backdrop .intro .work-index{background:var(--paper);z-index:4}}
+@media(max-width:700px) and (prefers-reduced-motion:no-preference){.has-backdrop .intro{height:165svh}.has-backdrop .intro-layout{top:10svh}.has-backdrop .intro .work-index{background:var(--paper);z-index:4}}
 @media(max-width:360px){.scope-top,.scope-bottom{font-size:8px}.scope-stage{height:102px}.scope-stage svg{height:65px}}
 @media(prefers-reduced-motion:reduce){.scope-stage path{transition:none;stroke-dashoffset:0}.work-index a{transition:none}}
 
