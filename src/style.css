@@ -342,3 +342,11 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
   @keyframes node-beat{0%,100%{box-shadow:0 0 0 3px #b9ffb322}50%{box-shadow:0 0 0 10px #b9ffb300}}
   @keyframes icon-beat{0%,100%{opacity:.7;scale:1}50%{opacity:1;scale:1.15}}
 }
+
+/* Let the ribbons and type carry the movement; keep printed rules secondary. */
+:root{--line:#d1d0c9}
+.trace-origin{display:none}
+.signal-scope{border-bottom:0}
+.closing-trace path:first-child,.closing-trace path:nth-child(3){display:none}
+.contact-links a{border-bottom-color:transparent}
+.contact-links a:hover,.contact-links a:focus-visible{border-bottom-color:#a6b6ff88}
