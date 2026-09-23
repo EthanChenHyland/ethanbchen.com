@@ -84,9 +84,35 @@ export function createBackdrop(parent: AbortSignal): void {
   const particleMaterial = material(new THREE.PointsMaterial({ color: '#315bff', size: .11, transparent: true, opacity: .3, sizeAttenuation: true, depthWrite: false }));
   const particles = new THREE.Points(particleGeometry, particleMaterial);scene.add(particles);
   const lineMaterial = material(new THREE.LineBasicMaterial({ color, transparent: true, opacity: .26, depthWrite: false }));
+  // Two fine filaments travel with the ribbons, giving the camera a visible
+  // route through the quieter spaces between chapter structures.
+  const filamentMaterial = material(new THREE.LineBasicMaterial({ color: '#315bff', transparent: true, opacity: .25, depthWrite: false }));
+  for (let strand = 0; strand < 2; strand++) {
+    const points: THREE.Vector3[] = [];
+    const count = innerWidth < 701 ? 520 : 900;
+    for (let i = 0; i <= count; i++) {
+      const t = i / count, center = route.getPointAt(t), angle = t * Math.PI * 22 + strand * Math.PI + Math.sin(t * 23) * .3;
+      const radius = 7.6 + Math.sin(t * 63 + strand) * .55;
+      points.push(new THREE.Vector3(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, center.z));
+    }
+    scene.add(new THREE.Line(geometry(new THREE.BufferGeometry().setFromPoints(points)), filamentMaterial));
+  }
+  const beaconCore = geometry(new THREE.SphereGeometry(.11, 8, 6));
+  const beaconHalo = geometry(new THREE.SphereGeometry(.29, 10, 8));
+  const beaconCoreMaterial = material(new THREE.MeshBasicMaterial({ color: '#315bff', transparent: true, opacity: .78, depthWrite: false }));
+  const beaconHaloMaterial = material(new THREE.MeshBasicMaterial({ color: '#315bff', transparent: true, opacity: .13, depthWrite: false, side: THREE.BackSide }));
+  const beacons = Array.from({ length: innerWidth < 701 ? 6 : 10 }, () => {
+    const group = new THREE.Group();group.add(new THREE.Mesh(beaconCore, beaconCoreMaterial), new THREE.Mesh(beaconHalo, beaconHaloMaterial));scene.add(group);return group;
+  });
+  const portalGeometry = geometry(new THREE.TorusGeometry(4.8, .025, 3, 112));
+  const portalMaterial = material(new THREE.MeshBasicMaterial({ color: '#315bff', transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }));
   const stations: { group: THREE.Group; index: number }[] = [];
   for (let chapter = 1; chapter < stops.length; chapter++) {
     const group = new THREE.Group(), point = route.getPointAt(chapter / stops.length);group.position.copy(point);scene.add(group);stations.push({ group, index: chapter });
+    for (let orbit = 0; orbit < 2; orbit++) {
+      const ring = new THREE.Mesh(portalGeometry, portalMaterial);
+      ring.scale.setScalar(orbit ? 1.34 : .8);ring.rotation.set(orbit ? .5 : -.25, orbit ? -.28 : .35, chapter * .24 + orbit);ring.position.z = orbit ? -2.4 : 1.8;group.add(ring);
+    }
     // Architectural marks: six findings, three channels, a score staff, a loose story.
     const count = chapter === 2 ? 6 : chapter === 3 ? 3 : chapter === 4 ? 12 : chapter === 5 ? 28 : 5;
     for (let i = 0; i < count; i++) {
@@ -154,19 +180,25 @@ export function createBackdrop(parent: AbortSignal): void {
     const chapter = Math.min(8, Math.floor(current * stops.length));
     const scopePhase = Number(introScope?.dataset.phase ?? 0);
     const activeForm = chapter === 1 ? previewChapter >= 0 ? previewChapter : Math.min(5,Math.max(2,scopePhase+2)) : chapter;
-    color.set(chapterColors[activeForm]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);particleMaterial.color.copy(uniforms.uColor.value);
+    color.set(chapterColors[activeForm]);uniforms.uColor.value.lerp(color,.08);lineMaterial.color.copy(uniforms.uColor.value);filamentMaterial.color.copy(uniforms.uColor.value);portalMaterial.color.copy(uniforms.uColor.value);beaconCoreMaterial.color.copy(uniforms.uColor.value);beaconHaloMaterial.color.copy(uniforms.uColor.value);particleMaterial.color.copy(uniforms.uColor.value);
     const quiet = chapter === 2 || chapter === 3 ? .72 : chapter === 7 ? .65 : chapter === 8 ? .75 : 1;
     form += (activeForm-form)*.055;uniforms.uForm.value=form;
     uniforms.uIntro.value += ((chapter === 1 ? 1 : 0)-uniforms.uIntro.value)*.07;
     uniforms.uScoreTime.value=audio?.currentTime ?? 0;
     uniforms.uPlaying.value += ((audio && !audio.paused ? 1 : 0)-uniforms.uPlaying.value)*.12;
     uniforms.uResolve.value=THREE.MathUtils.smoothstep(current*9,8.45,8.9) * .65;
-    uniforms.uQuiet.value=quiet;lineMaterial.opacity=.25*quiet;particleMaterial.opacity=.3*quiet;
+    uniforms.uQuiet.value=quiet;lineMaterial.opacity=.25*quiet;filamentMaterial.opacity=.34*quiet;portalMaterial.opacity=.36*quiet;beaconCoreMaterial.opacity=.85*quiet;beaconHaloMaterial.opacity=.18*quiet;particleMaterial.opacity=.3*quiet;
     uniforms.uHead.value=current;uniforms.uEnergy.value=energy;
     eye.copy(route.getPointAt(current));ahead.copy(route.getPointAt(Math.min(1,current+.045)));
     eye.x+=pointer.x*.55+Math.sin(elapsed*.19)*.24;eye.y+=pointer.y*.35+Math.cos(elapsed*.23)*.18;camera.position.copy(eye);camera.lookAt(ahead);camera.rotateZ(Math.sin(current*Math.PI*5)*.075);
     particles.position.x=Math.sin(elapsed*.21)*.24;particles.position.y=Math.cos(elapsed*.17)*.18;
-    stations.forEach(({group,index})=>{group.visible=Math.abs(index/9-current)<.24;group.rotation.z=Math.sin(elapsed*.2+index)*.09;});
+    beacons.forEach((beacon, i) => {
+      const strand = i % 2, t = (elapsed * .022 + i / beacons.length) % 1, center = route.getPointAt(t);
+      const angle = t * Math.PI * 22 + strand * Math.PI + Math.sin(t * 23) * .3, radius = 7.6 + Math.sin(t * 63 + strand) * .55;
+      beacon.position.set(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, center.z);
+      beacon.scale.setScalar(1 + Math.sin(elapsed * 2 + i) * .2);
+    });
+    stations.forEach(({group,index})=>{group.visible=Math.abs(index/9-current)<.24;group.rotation.z=Math.sin(elapsed*.2+index)*.16;group.rotation.y=Math.sin(elapsed*.16+index*.7)*.1;});
     renderer.render(scene,camera);renderer.domElement.dataset.frames=String(Number(renderer.domElement.dataset.frames||0)+1);renderer.domElement.dataset.progress=current.toFixed(4);
     wake();
   }
