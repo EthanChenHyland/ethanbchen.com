@@ -10,6 +10,7 @@ import { setupHeroField } from './hero-field';
 import { setupExplorers } from './explorers';
 import { setupPiano } from './piano';
 import { setupSignal } from './signal';
+import { setupTypeMotion } from './type-motion';
 
 const lifecycle = new AbortController();
 setupPointer(lifecycle.signal);
@@ -22,6 +23,7 @@ setupSchemaDesk(lifecycle.signal);
 setupProjectWorlds(lifecycle.signal);
 setupPiano(lifecycle.signal);
 setupSignal(lifecycle.signal);
+setupTypeMotion(lifecycle.signal);
 setupChapterNavigation(lifecycle.signal);
 setupProjectLens(lifecycle.signal);
 window.addEventListener('pagehide', event => {
