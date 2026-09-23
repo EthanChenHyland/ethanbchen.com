@@ -304,6 +304,12 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
   .kinetic-heading{animation:none!important;translate:none!important;opacity:1!important}
   .kinetic-word{transition:translate .35s cubic-bezier(.2,.8,.2,1),rotate .35s cubic-bezier(.2,.8,.2,1)}
   .kinetic-heading .kinetic-word:hover{translate:0 -.075em;rotate:-2deg}
+  .masthead nav a{transition:color .45s cubic-bezier(.2,.8,.2,1),translate .45s cubic-bezier(.2,.8,.2,1)}
+  .masthead nav a:hover,.masthead nav a:focus-visible{translate:0 -3px}
+  .masthead nav a span{transition:color .45s,translate .45s cubic-bezier(.2,.8,.2,1)}
+  .masthead nav a:hover span,.masthead nav a:focus-visible span{color:var(--blue);translate:2px 0}
+  .wordmark{transition:translate .45s cubic-bezier(.2,.8,.2,1)}
+  .wordmark:hover,.wordmark:focus-visible{translate:0 -2px}
   .section-rule{position:relative}
   .section-rule::after{content:'';position:absolute;top:-2px;left:0;width:22px;height:3px;background:var(--blue);transform:translateX(0);animation:rule-scan 9s ease-in-out infinite alternate;pointer-events:none}
   .prompt-scene .section-rule::after,.piano-scene .section-rule::after{background:#c4e6b7}
