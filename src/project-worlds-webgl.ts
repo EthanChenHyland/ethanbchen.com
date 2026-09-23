@@ -82,12 +82,20 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
       scenes[index].labels.push({ el, position });release.push(() => el.remove());return el;
     }
     // Six specimen planes: changing the DOM contract lifts its corresponding plane.
-    const schema = scenes[0], plates: THREE.Mesh[] = [];
+    const schema = scenes[0], plates: THREE.Mesh[] = [], reticles: THREE.LineSegments[] = [];
     const plateGeometry = ownGeometry(new THREE.BoxGeometry(2.45, 1.65, .045));
+    const corner = .23, x = 1.36, y = .96, z = .09;
+    const reticlePoints: number[] = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      reticlePoints.push(sx * x, sy * (y - corner), z, sx * x, sy * y, z, sx * x, sy * y, z, sx * (x - corner), sy * y, z);
+    }
+    const reticleGeometry = ownGeometry(new THREE.BufferGeometry());reticleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(reticlePoints, 3));
     schemaFields.forEach((field, i) => {
       const material = ownMaterial(new THREE.MeshStandardMaterial({ color: i === 0 ? '#315bff' : '#b8c8fa', roughness: .6, metalness: .13 }));
       const plate = new THREE.Mesh(plateGeometry, material);plate.userData.field = i;schema.group.add(plate);plates.push(plate);schema.pickables.push(plate);
       const edges = new THREE.LineSegments(ownGeometry(new THREE.EdgesGeometry(plateGeometry)), lineMaterial);plate.add(edges);
+      const reticle = new THREE.LineSegments(reticleGeometry, ownMaterial(new THREE.LineBasicMaterial({ color: '#315bff', transparent: true, opacity: .95, depthTest: false })));
+      reticle.visible = i === 0;plate.add(reticle);reticles.push(reticle);
       label(0, field.replaceAll('_', ' ').replace('osteoarthritis','osteo\u00adarthritis'), new THREE.Vector3());
       for (let j = 0; j < 4; j++) {
         const dot = new THREE.Mesh(ownGeometry(new THREE.SphereGeometry(.07, 8, 6)), ownMaterial(new THREE.MeshBasicMaterial({ color: '#f2efe8' })));
@@ -101,9 +109,15 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     views[0].closest('figure')!.querySelector('input')!.addEventListener('input', event => { schema.targetDepth = Number((event.target as HTMLInputElement).value);wake(); }, { signal });
     const schemaStatus = views[0].closest('figure')!.querySelector<HTMLElement>('.volume-status')!;
     const schemaButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-field]')];
-    const updateSchemaStatus = (i: number) => { schemaStatus.textContent = `SELECTED / 0${i + 1} ${schemaFields[i].replaceAll('_', ' ').toUpperCase()}`; };
+    const updateSchemaStatus = (i: number, preview = false) => { schemaStatus.textContent = `${preview ? 'INSPECT' : 'SELECTED'} / 0${i + 1} ${schemaFields[i].replaceAll('_', ' ').toUpperCase()}`; };
     updateSchemaStatus(0);
-    schemaButtons.forEach((button, i) => button.addEventListener('click', () => { schema.selected = i;schema.labels.forEach(({ el }, index) => el.classList.toggle('selected', index === i));updateSchemaStatus(i);wake(); }, { signal }));
+    schemaButtons.forEach((button, i) => {
+      const preview = () => { schema.hover = i;updateSchemaStatus(i, true);wake(); };
+      const clear = () => { if (schema.hover === i) { schema.hover = -1;updateSchemaStatus(schema.selected);wake(); } };
+      button.addEventListener('pointerenter', preview, { signal });button.addEventListener('pointerleave', clear, { signal });
+      button.addEventListener('focus', preview, { signal });button.addEventListener('blur', clear, { signal });
+      button.addEventListener('click', () => { schema.selected = i;schema.labels.forEach(({ el }, index) => el.classList.toggle('selected', index === i));updateSchemaStatus(i);wake(); }, { signal });
+    });
 
     // The source-rendered application interface sits in front of two independent audio planes.
     const context = scenes[1], contextPlanes: THREE.Mesh[] = [], channelWaves: THREE.Line[] = [];
@@ -161,9 +175,16 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         if (event.key === 'ArrowDown') world.target.x += .12;
         world.target.clamp(new THREE.Vector2(-.9,-1.1), new THREE.Vector2(.9,1.1));wake();
       }, { signal });
-      view.addEventListener('pointerdown', event => { if (event.target instanceof HTMLElement && event.target.closest('a,button,input')) return;activeDrag = { index, x: event.clientX, y: event.clientY, startX: world.target.x, startY: world.target.y, moved: false }; }, { signal });
+      view.addEventListener('pointerdown', event => { if (event.target instanceof HTMLElement && event.target.closest('a,button,input')) return;world.hover = -1;view.classList.remove('is-hovering-plate');if (index === 0) updateSchemaStatus(world.selected);activeDrag = { index, x: event.clientX, y: event.clientY, startX: world.target.x, startY: world.target.y, moved: false }; }, { signal });
       view.addEventListener('pointermove', event => {
-        if (!activeDrag || activeDrag.index !== index) return;
+        if (!activeDrag || activeDrag.index !== index) {
+          if (index !== 0 || event.pointerType === 'touch') return;
+          const rect = view.getBoundingClientRect();fit(rect.width, rect.height, index, passage(rect.top, rect.height));world.group.updateMatrixWorld(true);
+          pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2);raycaster.setFromCamera(pointer, camera);
+          const hit = raycaster.intersectObjects(world.pickables, false)[0];const hovered = hit ? Number(hit.object.userData.field) : -1;
+          if (hovered !== world.hover) { world.hover = hovered;view.classList.toggle('is-hovering-plate', hovered >= 0);updateSchemaStatus(hovered >= 0 ? hovered : world.selected, hovered >= 0);wake(); }
+          return;
+        }
         const dx = event.clientX - activeDrag.x, dy = event.clientY - activeDrag.y;
         if (event.pointerType === 'touch' && !activeDrag.moved) {
           // Commit only after the gesture has an axis; vertical swipes belong to native scrolling.
@@ -182,6 +203,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         if (index === 2 && hit.instanceId !== undefined) { const note = notes[hit.instanceId];seek(note.start);updateTime(note.start);views[2].closest('figure')!.querySelector('.volume-status')!.textContent = `MIDI ${note.pitch} / ${note.start.toFixed(2)} SEC`; }
       }, { signal });
       view.addEventListener('pointercancel', () => { activeDrag = null; }, { signal });
+      view.addEventListener('pointerleave', () => { if (world.hover >= 0) { world.hover = -1;view.classList.remove('is-hovering-plate');if (index === 0) updateSchemaStatus(world.selected);wake(); } }, { signal });
       const reset = document.createElement('button');reset.type = 'button';reset.className = 'volume-reset mono';reset.textContent = 'RESET VIEW ↺';view.after(reset);
       reset.addEventListener('click', () => { world.target.set(index === 2 ? -.45 : -.12, -.24);wake(); }, { signal });release.push(() => reset.remove());
       if (index !== 1) view.classList.add('world-ready');
@@ -215,7 +237,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         world.group.position.y = Math.sin(elapsed * .65 + world.index) * .09 * floating;
         if (world.index === 0) {
           const points: THREE.Vector3[] = [];
-          plates.forEach((plate, i) => { plate.position.set((i % 3 - 1) * 2.95, i < 3 ? 1.18 : -1.18, (i % 3 - 1) * (world.depth + arrival * .65) * 1.6 + (i === world.selected ? .6 : 0) + Math.sin(elapsed * .9 + i * .8) * .16);plate.rotation.y = (i % 3 - 1) * world.depth * -.2;(plate.material as THREE.MeshStandardMaterial).color.set(i === world.selected ? '#315bff' : '#b8c8fa');world.labels[i].el.classList.toggle('selected', i === world.selected);world.labels[i].position.copy(plate.position).add(new THREE.Vector3(0, -.28, .1));points.push(plate.position.clone()); });
+          plates.forEach((plate, i) => { const selected = i === world.selected, hovered = i === world.hover;plate.position.set((i % 3 - 1) * 2.95, i < 3 ? 1.18 : -1.18, (i % 3 - 1) * (world.depth + arrival * .65) * 1.6 + (selected ? .6 : hovered ? .32 : 0) + Math.sin(elapsed * .9 + i * .8) * .16);plate.rotation.y = (i % 3 - 1) * world.depth * -.2;plate.scale.setScalar(THREE.MathUtils.lerp(plate.scale.x, selected ? 1.075 : hovered ? 1.05 : 1, .16));(plate.material as THREE.MeshStandardMaterial).color.set(selected ? '#315bff' : hovered ? '#e8efff' : '#b8c8fa');reticles[i].visible = selected || hovered;world.labels[i].el.classList.toggle('selected', selected);world.labels[i].el.classList.toggle('hovered', hovered && !selected);world.labels[i].position.copy(plate.position).add(new THREE.Vector3(0, -.28, .1));points.push(plate.position.clone()); });
           schemaTraceGeometry.setFromPoints(points);
           const travel = (elapsed * .65) % (points.length - 1), segment = Math.floor(travel);
           courier.position.lerpVectors(points[segment], points[segment + 1], travel - segment);courier.position.z += .12;

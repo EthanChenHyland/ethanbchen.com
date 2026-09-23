@@ -281,3 +281,6 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
  .contact-scene .frog-signature{height:48px;bottom:6px}
  .journey-route[data-chapter="8"]{display:none}
 }
+
+/* The specimen responds to inspection without obscuring its field names. */
+.project-world.is-hovering-plate{cursor:pointer}.project-world.is-hovering-plate:active{cursor:grabbing}.schema-label.hovered{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
