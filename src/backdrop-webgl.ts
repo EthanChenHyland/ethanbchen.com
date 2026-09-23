@@ -56,7 +56,7 @@ export function createBackdrop(parent: AbortSignal): void {
         gl_Position=clip;
       }`,
     fragmentShader: `varying vec2 vUv;varying float vDepth;varying float vFold;varying float vStrand;uniform vec3 uColor;uniform float uHead;uniform float uQuiet;uniform float uPulse;uniform float uTime;
-      void main(){float side=abs(vUv.y-.5)*2.;float edge=pow(side,9.);float head=exp(-pow((vUv.x-uHead)*35.,2.));float distanceFade=smoothstep(1.,7.,vDepth)*(1.-smoothstep(65.,125.,vDepth));float glint=pow(max(0.,sin(vUv.x*105.-uTime*1.9+vUv.y*8.+vStrand*3.)),22.);float satin=pow(max(0.,vFold*.5+.5),5.);float alpha=(.17+edge*.68+glint*.22+satin*.11+head*(.28+uPulse*.6))*distanceFade*uQuiet;vec3 ink=mix(uColor,vec3(.75,.86,1.),clamp(glint*.62+satin*.21,0.,.7));gl_FragColor=vec4(ink,alpha);#include <colorspace_fragment>
+      void main(){float side=abs(vUv.y-.5)*2.;float edge=pow(side,7.);float head=exp(-pow((vUv.x-uHead)*35.,2.));float distanceFade=smoothstep(1.,7.,vDepth)*(1.-smoothstep(65.,125.,vDepth));float glint=pow(max(0.,sin(vUv.x*105.-uTime*1.9+vUv.y*8.+vStrand*3.)),22.);float satin=pow(max(0.,vFold*.5+.5),5.);float rim=pow(max(0.,1.-abs(vUv.y-.2)*11.),15.);float alpha=(.25+edge*.71+rim*.27+glint*.22+satin*.1+head*(.26+uPulse*.55))*distanceFade*uQuiet;vec3 ink=mix(uColor,vec3(.78,.88,1.),clamp(glint*.56+satin*.21+rim*.45,0.,.8));ink=mix(ink,uColor*.58,edge*.52);gl_FragColor=vec4(ink,min(alpha,1.));#include <colorspace_fragment>
       }`.replace(';#include', ';\n#include')
   }));
   // The same three traces travel past every project. They periodically flatten,
@@ -67,7 +67,7 @@ export function createBackdrop(parent: AbortSignal): void {
     for (let i = 0; i <= segments; i++) {
       const t = i / segments, center = route.getPointAt(t), phase = t * Math.PI * 7 + strand * Math.PI * 2 / 3 + Math.sin(t * Math.PI * 19 + strand) * .13;
       const radius = 6.5 + Math.sin(t * Math.PI * 12) * 1.6;
-      const halfWidth = .12 + Math.sin(t * Math.PI * 28 + strand * 2) * .025;
+      const halfWidth = (.165 + Math.sin(t * Math.PI * 28 + strand * 2) * .025) * (innerWidth < 701 ? .85 : 1);
       for (const side of [-1, 1]) { const a = phase + side * halfWidth;vertices.push(center.x + Math.cos(a) * radius, center.y + Math.sin(a) * radius, center.z);uvs.push(t, (side + 1) / 2);strands.push(strand);centers.push(center.x,center.y,center.z); }
       if (i < segments) { const n = i * 2;indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
     }
@@ -171,7 +171,7 @@ export function createBackdrop(parent: AbortSignal): void {
     wake();
   }
   function wake(){if(!frame&&!dead&&!document.hidden)frame=requestAnimationFrame(draw);}
-  function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<701?1:1.25));renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<701?72:58;camera.updateProjectionMatrix();measure();}
+  function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<701?1:1.25));renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<701?70:54;camera.updateProjectionMatrix();measure();}
   const observer=new ResizeObserver(measure);sections.forEach(section=>observer.observe(section));
   function dispose(){if(dead)return;dead=true;lifetime.abort();parent.removeEventListener('abort',dispose);observer.disconnect();cancelAnimationFrame(frame);geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();nav.remove();document.body.classList.remove('has-backdrop');delete document.body.dataset.chapter;}
   window.addEventListener('scroll',()=>{const delta=scrollY-lastY;energy=Math.min(2,energy+Math.abs(delta)/180);if(Math.abs(delta)>3)nav.dataset.direction=delta>0?'down':'up';lastY=scrollY;updateTarget();},{passive:true,signal});
