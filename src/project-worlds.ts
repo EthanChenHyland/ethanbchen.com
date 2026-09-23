@@ -12,10 +12,10 @@ export function setupProjectWorlds(parent: AbortSignal): void {
     figure.innerHTML = `<div class="volume-heading mono"><span>${title}</span><span class="volume-status">SPATIAL STUDY</span></div><div class="project-world" data-world="${kind}" aria-label="${caption}"><svg class="volume-fallback" viewBox="0 0 900 450" aria-hidden="true"><path d="M30 320H130V140H310V320H490V140H670V320H870"/><path d="M130 90V370M310 90V370M490 90V370M670 90V370"/></svg></div><figcaption class="volume-caption mono">${caption}</figcaption></figure>`;
     return figure;
   };
-  const schema = makeSurface('schema', '01 / OPEN THE CONTRACT', 'DRAG TO TURN · SELECT A FINDING · PULL THE STRUCTURE APART');
+  const schema = makeSurface('schema', '01 / OPEN THE CONTRACT', 'DRAG TO TURN · SELECT A FINDING · KEYS 1–6 SELECT A FIELD');
   prompt.before(schema);
   clarity.classList.add('project-world');clarity.dataset.world = 'context';
-  const music = makeSurface('music', '03 / WALK THROUGH THE SCORE', '69 EXPECTED MIDI NOTES · DRAG TO TURN · SELECT A NOTE TO SEEK');
+  const music = makeSurface('music', '03 / WALK THROUGH THE SCORE', '69 EXPECTED MIDI NOTES · PLAY THE SCORE · SELECT A NOTE TO SEEK');
   piano.before(music);
   const schemaControl = document.createElement('label');
   schemaControl.className = 'volume-control mono';

@@ -137,7 +137,14 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         channelWaves.push(wire(Array.from({ length: 90 }, (_, j) => new THREE.Vector3(-3.7 + j / 89 * 7.4, Math.sin(j * .25 + i) * .22, .03)), mesh as unknown as THREE.Group));
       }
     }
-    document.querySelectorAll<HTMLButtonElement>('[data-channel]').forEach((button, i) => button.addEventListener('click', () => { context.selected = i;context.target.y = (i - 1) * .25;wake(); }, { signal }));
+    const channelButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-channel]')];
+    const previewChannel = (i: number) => { context.hover = i;channelButtons.forEach((button, index) => button.classList.toggle('is-preview', index === i));wake(); };
+    const clearChannel = () => { context.hover = -1;channelButtons.forEach(button => button.classList.remove('is-preview'));wake(); };
+    channelButtons.forEach((button, i) => {
+      button.addEventListener('pointerenter', () => previewChannel(i), { signal });button.addEventListener('pointerleave', clearChannel, { signal });
+      button.addEventListener('focus', () => previewChannel(i), { signal });button.addEventListener('blur', clearChannel, { signal });
+      button.addEventListener('click', () => { context.selected = i;context.target.y = (i - 1) * .25;wake(); }, { signal });
+    });
     document.querySelector('.context-depth input')!.addEventListener('input', event => { context.targetDepth = Number((event.target as HTMLInputElement).value);wake(); }, { signal });
 
     // Score coordinates are time × pitch. Height separates the two pitch registers.
@@ -154,20 +161,42 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
     const audio = document.querySelector<HTMLAudioElement>('#minuet-audio')!;
     const scrub = views[2].closest('figure')!.querySelector<HTMLInputElement>('input')!;
     const output = views[2].closest('figure')!.querySelector('output')!;
+    const musicStatus = views[2].closest('figure')!.querySelector<HTMLElement>('.volume-status')!;
+    let selectedNote: number | null = null;
+    const updateMusicStatus = () => {
+      if (music.hover >= 0) { const note = notes[music.hover];musicStatus.textContent = `INSPECT / MIDI ${note.pitch} · ${note.start.toFixed(2)} SEC`; }
+      else if (!audio.paused) musicStatus.textContent = `PLAYING / ${audio.currentTime.toFixed(2)} SEC`;
+      else if (audio.ended) musicStatus.textContent = 'SCORE COMPLETE / REPLAY ↺';
+      else if (selectedNote !== null) { const note = notes[selectedNote];musicStatus.textContent = `MIDI ${note.pitch} / ${note.start.toFixed(2)} SEC`; }
+      else if (audio.currentTime > 0) musicStatus.textContent = `PAUSED / ${audio.currentTime.toFixed(2)} SEC`;
+      else musicStatus.textContent = 'READY / 69 MIDI NOTES';
+    };
+    updateMusicStatus();
     let pendingSeek: number | undefined, requestedMetadata = false;
     const seek = (time: number) => { if (Number.isFinite(audio.duration)) audio.currentTime = time;else { pendingSeek = time;if (!requestedMetadata) { requestedMetadata = true;audio.preload = 'metadata';audio.load(); } } };
     audio.addEventListener('loadedmetadata', () => { if (pendingSeek !== undefined) { audio.currentTime = pendingSeek;pendingSeek = undefined; } }, { signal });
-    const updateTime = (time: number) => { music.time = time;scrub.value = String(time);output.textContent = `${time.toFixed(2)} SEC`;wake(); };
+    const updateTime = (time: number) => { music.time = time;scrub.value = String(time);output.textContent = `${time.toFixed(2)} SEC`;updateMusicStatus();wake(); };
     scrub.addEventListener('input', () => { const time = Number(scrub.value);seek(time);updateTime(time); }, { signal });
     audio.addEventListener('timeupdate', () => updateTime(audio.currentTime), { signal });
+    const playButton = document.createElement('button');playButton.type = 'button';playButton.className = 'volume-play mono';
+    const syncPlayback = () => { playButton.textContent = audio.paused ? audio.ended ? 'REPLAY SCORE ↺' : 'PLAY SCORE ▶' : 'PAUSE SCORE Ⅱ';playButton.setAttribute('aria-label', audio.paused ? 'Play Minuet score' : 'Pause Minuet score');updateMusicStatus();wake(); };
+    const togglePlayback = () => { if (audio.paused) { if (audio.ended) seek(0);void audio.play().catch(() => { musicStatus.textContent = 'AUDIO UNAVAILABLE'; }); } else audio.pause(); };
+    playButton.addEventListener('click', togglePlayback, { signal });
+    for (const event of ['play', 'pause', 'ended']) audio.addEventListener(event, syncPlayback, { signal });
+    syncPlayback();
     let activeDrag: { index: number; x: number; y: number; startX: number; startY: number; moved: boolean } | null = null;
     scenes.forEach((world, index) => {
       const view = world.view;
-      view.tabIndex = 0;view.setAttribute('role', 'group');view.setAttribute('aria-description', 'Drag or use arrow keys to rotate. Home resets the view.');
+      view.tabIndex = 0;view.setAttribute('role', 'group');view.setAttribute('aria-description', index === 2 ? 'Drag or use arrow keys to rotate. Space plays or pauses the score. Home resets the view.' : index === 0 ? 'Drag or use arrow keys to rotate. Keys 1 through 6 select a field. Home resets the view.' : 'Drag or use arrow keys to rotate. Keys 1 through 3 select a channel. Home resets the view.');
       release.push(() => { view.removeAttribute('tabindex');view.removeAttribute('aria-description'); });
       view.addEventListener('keydown', event => {
-        if (event.target !== view || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)) return;
+        if (event.target === view && index < 2 && /^[1-6]$/.test(event.key)) {
+          const selected = Number(event.key) - 1, buttons = index === 0 ? schemaButtons : channelButtons;
+          if (selected < buttons.length) { event.preventDefault();buttons[selected].click();return; }
+        }
+        if (event.target !== view || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home',...(index === 2 ? [' '] : [])].includes(event.key)) return;
         event.preventDefault();
+        if (event.key === ' ') { togglePlayback();return; }
         if (event.key === 'Home') world.target.set(index === 2 ? -.45 : -.12, -.24);
         if (event.key === 'ArrowLeft') world.target.y -= .12;
         if (event.key === 'ArrowRight') world.target.y += .12;
@@ -175,14 +204,19 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         if (event.key === 'ArrowDown') world.target.x += .12;
         world.target.clamp(new THREE.Vector2(-.9,-1.1), new THREE.Vector2(.9,1.1));wake();
       }, { signal });
-      view.addEventListener('pointerdown', event => { if (event.target instanceof HTMLElement && event.target.closest('a,button,input')) return;world.hover = -1;view.classList.remove('is-hovering-plate');if (index === 0) updateSchemaStatus(world.selected);activeDrag = { index, x: event.clientX, y: event.clientY, startX: world.target.x, startY: world.target.y, moved: false }; }, { signal });
+      view.addEventListener('pointerdown', event => { if (event.target instanceof HTMLElement && event.target.closest('a,button,input')) return;world.hover = -1;view.classList.remove('is-hovering-plate', 'is-hovering-object');if (index === 0) updateSchemaStatus(world.selected);if (index === 1) clearChannel();if (index === 2) updateMusicStatus();activeDrag = { index, x: event.clientX, y: event.clientY, startX: world.target.x, startY: world.target.y, moved: false }; }, { signal });
       view.addEventListener('pointermove', event => {
         if (!activeDrag || activeDrag.index !== index) {
-          if (index !== 0 || event.pointerType === 'touch') return;
+          if (event.pointerType === 'touch') return;
           const rect = view.getBoundingClientRect();fit(rect.width, rect.height, index, passage(rect.top, rect.height));world.group.updateMatrixWorld(true);
           pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2);raycaster.setFromCamera(pointer, camera);
-          const hit = raycaster.intersectObjects(world.pickables, false)[0];const hovered = hit ? Number(hit.object.userData.field) : -1;
-          if (hovered !== world.hover) { world.hover = hovered;view.classList.toggle('is-hovering-plate', hovered >= 0);updateSchemaStatus(hovered >= 0 ? hovered : world.selected, hovered >= 0);wake(); }
+          const hit = raycaster.intersectObjects(world.pickables, false)[0];const hovered = hit ? index === 2 ? hit.instanceId ?? -1 : Number(hit.object.userData[index === 0 ? 'field' : 'channel']) : -1;
+          if (hovered !== world.hover) {
+            world.hover = hovered;view.classList.toggle(index === 0 ? 'is-hovering-plate' : 'is-hovering-object', hovered >= 0);
+            if (index === 0) updateSchemaStatus(hovered >= 0 ? hovered : world.selected, hovered >= 0);
+            if (index === 1) channelButtons.forEach((button, i) => button.classList.toggle('is-preview', i === hovered));
+            if (index === 2) updateMusicStatus();wake();
+          }
           return;
         }
         const dx = event.clientX - activeDrag.x, dy = event.clientY - activeDrag.y;
@@ -200,12 +234,14 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
         const hit = raycaster.intersectObjects(world.pickables, false)[0];if (!hit) return;
         if (index === 0) document.querySelectorAll<HTMLButtonElement>('[data-field]')[hit.object.userData.field]?.click();
         if (index === 1) document.querySelectorAll<HTMLButtonElement>('[data-channel]')[hit.object.userData.channel]?.click();
-        if (index === 2 && hit.instanceId !== undefined) { const note = notes[hit.instanceId];seek(note.start);updateTime(note.start);views[2].closest('figure')!.querySelector('.volume-status')!.textContent = `MIDI ${note.pitch} / ${note.start.toFixed(2)} SEC`; }
+        if (index === 2 && hit.instanceId !== undefined) { const note = notes[hit.instanceId];selectedNote = hit.instanceId;seek(note.start);updateTime(note.start); }
       }, { signal });
       view.addEventListener('pointercancel', () => { activeDrag = null; }, { signal });
-      view.addEventListener('pointerleave', () => { if (world.hover >= 0) { world.hover = -1;view.classList.remove('is-hovering-plate');if (index === 0) updateSchemaStatus(world.selected);wake(); } }, { signal });
-      const reset = document.createElement('button');reset.type = 'button';reset.className = 'volume-reset mono';reset.textContent = 'RESET VIEW ↺';view.after(reset);
-      reset.addEventListener('click', () => { world.target.set(index === 2 ? -.45 : -.12, -.24);wake(); }, { signal });release.push(() => reset.remove());
+      view.addEventListener('pointerleave', () => { if (world.hover >= 0) { world.hover = -1;view.classList.remove('is-hovering-plate', 'is-hovering-object');if (index === 0) updateSchemaStatus(world.selected);if (index === 1) clearChannel();if (index === 2) updateMusicStatus();wake(); } }, { signal });
+      const actions = document.createElement('div');actions.className = 'volume-actions';view.after(actions);
+      if (index === 2) actions.append(playButton);
+      const reset = document.createElement('button');reset.type = 'button';reset.className = 'volume-reset mono';reset.textContent = 'RESET VIEW ↺';actions.append(reset);
+      reset.addEventListener('click', () => { world.target.set(index === 2 ? -.45 : -.12, -.24);wake(); }, { signal });release.push(() => actions.remove());
       if (index !== 1) view.classList.add('world-ready');
     });
     function passage(top: number, height: number) { return THREE.MathUtils.clamp((innerHeight - top) / (innerHeight + height), 0, 1); }
@@ -242,7 +278,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
           const travel = (elapsed * .65) % (points.length - 1), segment = Math.floor(travel);
           courier.position.lerpVectors(points[segment], points[segment + 1], travel - segment);courier.position.z += .12;
         } else if (world.index === 1) {
-          contextPlanes.forEach((plane, i) => { plane.position.set(i * world.depth * .75, (i - 1) * world.depth * .85, (1 - i) * (world.depth + arrival * .7) * 2.1 + Math.sin(elapsed * .7 + i) * .13);world.labels[i].position.copy(plane.position).add(new THREE.Vector3(-2.5, i === 0 ? 2.8 : 2.2, .08)); });
+          contextPlanes.forEach((plane, i) => { const selected = i === world.selected, hovered = i === world.hover;plane.position.set(i * world.depth * .75, (i - 1) * world.depth * .85, (1 - i) * (world.depth + arrival * .7) * 2.1 + Math.sin(elapsed * .7 + i) * .13 + (i > 0 ? selected ? .5 + i * 3 : hovered ? .3 + i * 2.8 : 0 : 0));if (i > 0) (plane.material as THREE.MeshStandardMaterial).opacity = selected ? .09 : hovered ? .15 : .06;world.labels[i].el.classList.toggle('selected', selected);world.labels[i].el.classList.toggle('hovered', hovered);world.labels[i].position.copy(plane.position).add(new THREE.Vector3(-2.5, i === 0 ? 2.8 : 2.2, .08)); });
           channelWaves.forEach((wave, channel) => {
             const positions = wave.geometry.getAttribute('position');
             for (let j = 0; j < positions.count; j++) positions.setY(j, Math.sin(j * .25 - elapsed * 2.2 + channel) * (.16 + .1 * Math.sin(j * .07 + elapsed)));
@@ -252,7 +288,7 @@ export async function createProjectWorlds(views: HTMLElement[], parent: AbortSig
           // Keep exact score coordinates and playback time; light supplies ambient motion.
           noteMaterial.emissive.set('#506942');noteMaterial.emissiveIntensity = .18 + .12 * Math.sin(elapsed * 1.4);
           head.position.x = -5.4 + world.time / 12.3 * 10.8;
-          notes.forEach((note, i) => bars.setColorAt(i, color.set(world.time >= note.start && world.time <= note.start + note.duration ? '#ffffff' : '#c4e6b7')));if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
+          notes.forEach((note, i) => bars.setColorAt(i, color.set(i === world.hover ? '#f8ff94' : world.time >= note.start && world.time <= note.start + note.duration ? '#ffffff' : '#c4e6b7')));if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
         }
         fit(r.width, r.height, world.index, passage(r.top, r.height));world.group.updateMatrixWorld(true);
         const projected = new THREE.Vector3();world.labels.forEach(({ el, position }) => { projected.copy(position);world.group.localToWorld(projected);projected.project(camera);const inset = Math.min(world.index === 1 ? 75 : 40, r.width / 4);el.style.left = `${r.left + THREE.MathUtils.clamp((projected.x + 1) * .5 * r.width, inset, r.width - inset)}px`;el.style.top = `${r.top + THREE.MathUtils.clamp((1 - projected.y) * .5 * r.height, 12, r.height - 12)}px`;el.hidden = false; });
