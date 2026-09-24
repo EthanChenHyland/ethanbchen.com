@@ -9,6 +9,7 @@ import { setupWorkbench } from './workbench';
 import { setupHeroField } from './hero-field';
 import { setupExplorers } from './explorers';
 import { setupPiano } from './piano';
+import { setupFullMinuet } from './full-minuet';
 import { setupSignal } from './signal';
 import { setupTypeMotion } from './type-motion';
 
@@ -22,6 +23,7 @@ setupExplorers(lifecycle.signal);
 setupSchemaDesk(lifecycle.signal);
 setupProjectWorlds(lifecycle.signal);
 setupPiano(lifecycle.signal);
+setupFullMinuet(lifecycle.signal);
 setupSignal(lifecycle.signal);
 setupTypeMotion(lifecycle.signal);
 setupChapterNavigation(lifecycle.signal);

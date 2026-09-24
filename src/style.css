@@ -356,3 +356,44 @@ body[data-chapter="8"] .scene-backdrop{opacity:.5}
 .closing-trace path:first-child,.closing-trace path:nth-child(3){display:none}
 .contact-links a{border-bottom-color:transparent}
 .contact-links a:hover,.contact-links a:focus-visible{border-bottom-color:#a6b6ff88}
+
+/* A complete score follows the native audio clock; the captured MIR excerpt stays below. */
+.full-minuet{margin:30px 0 60px;padding:24px 0 28px;border-top:1px solid #c4e6b770;border-bottom:1px solid #c4e6b770}
+.full-minuet-head{display:flex;justify-content:space-between;gap:20px;color:#c4e6b7}
+.full-minuet-intro{display:flex;justify-content:space-between;align-items:end;gap:20px;margin:30px 0 25px}
+.full-minuet-intro p{font:clamp(39px,5.4vw,75px)/.98 Instrument,Georgia,serif;letter-spacing:-.03em}
+.full-minuet-intro em{color:#c4e6b7}
+.full-minuet-intro>.mono{color:#b8c8bf;white-space:nowrap}
+.full-score-shell{--score-label-width:90px;display:grid;grid-template-columns:var(--score-label-width) minmax(0,1fr);position:relative;border:1px solid #c4e6b73d;background:#17211f}
+.full-score-labels{display:grid;grid-template-rows:1fr 1fr;border-right:1px solid #c4e6b73d;color:#b8c8bf;font-size:10px}
+.full-score-labels span{display:flex;align-items:center;padding:15px;line-height:1.7}
+.full-score-labels span+span{border-top:1px solid #c4e6b729}
+.full-score-window{overflow-x:auto;overflow-y:hidden;position:relative;min-width:0;scrollbar-color:#c4e6b7 #26312d;scrollbar-width:thin;touch-action:pan-x;cursor:ew-resize}
+.full-score-window:focus-visible{outline:2px solid #c4e6b7;outline-offset:2px}
+.full-score-track{height:280px;position:relative;background:linear-gradient(to bottom,transparent calc(50% - 1px),#c4e6b72a 50%,transparent calc(50% + 1px)),linear-gradient(180deg,#21302a,#192622)}
+.full-score-note{position:absolute;height:7px;min-width:3px;border-radius:1px;background:#d6f1c5;box-shadow:0 0 10px #c4e6b735;pointer-events:none}
+.full-score-note[data-hand="1"]{background:#a6b6ff;box-shadow:0 0 10px #a6b6ff30}
+.full-score-note.is-active{background:#fff;box-shadow:0 0 0 2px #fff5,0 0 16px #fff9}
+.full-score-measure{position:absolute;top:10px;bottom:10px;width:1px;background:#c4e6b72e;pointer-events:none}
+.full-score-measure b{position:absolute;top:1px;left:7px;font:10px Plex,monospace;color:#c4e6b7;font-weight:400;white-space:nowrap}
+.full-score-cursor{position:absolute;left:calc(var(--score-label-width) + (100% - var(--score-label-width)) * .32);top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 14px #fff8;pointer-events:none}
+.full-score-cursor::before{content:'';position:absolute;top:0;left:-4px;width:10px;height:10px;background:#fff;border-radius:50%}
+.full-minuet-controls{display:flex;align-items:center;gap:32px;margin-top:22px}
+.full-minuet-play{flex:0 0 196px;min-height:48px;border:1px solid #c4e6b7;background:#c4e6b7;color:#17211f;cursor:pointer;transition:background .2s,color .2s,transform .2s}
+.full-minuet-play:hover{background:transparent;color:#c4e6b7;transform:translateY(-2px)}
+.full-minuet-play:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.full-minuet-scrub{display:flex;align-items:center;gap:16px;flex:1;color:#c4e6b7;font-size:10px}
+.full-minuet-scrub input{flex:1;min-width:100px;accent-color:#c4e6b7;min-height:44px}
+.full-minuet-scrub output{white-space:nowrap;min-width:95px;text-align:right}
+.full-minuet-note{margin-top:15px;color:#b8c8bf;font-size:10px;line-height:1.6}
+.excerpt-heading{color:#c4e6b7;margin:0 0 12px}
+@media(max-width:700px){
+ .full-minuet{margin:18px 0 40px;padding:18px 0}
+ .full-minuet-head{font-size:9px}.full-minuet-head span:last-child{text-align:right}
+ .full-minuet-intro{display:block;margin:25px 0 18px}.full-minuet-intro p{font-size:48px}.full-minuet-intro>.mono{display:block;margin-top:15px;font-size:9px}
+ .full-score-shell{--score-label-width:54px}.full-score-labels{font-size:8px}.full-score-labels span{padding:6px}
+ .full-score-track{height:235px}.full-score-note{height:6px}
+ .full-minuet-controls{display:block;margin-top:17px}.full-minuet-play{width:100%}
+ .full-minuet-scrub{gap:10px;margin-top:10px}.full-minuet-scrub output{min-width:83px}
+ .full-minuet-note{font-size:9px}
+}
