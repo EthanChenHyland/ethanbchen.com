@@ -10,6 +10,8 @@ export function setupSignal(signal: AbortSignal): void {
   const contact = document.querySelector<HTMLElement>('.contact-scene');
   const pipeline = document.querySelector<HTMLOListElement>('.evaluation-path');
   const steps = [...document.querySelectorAll<HTMLLIElement>('.evaluation-path li')];
+  const spine = document.querySelector<HTMLElement>('.context-spine');
+  const milestones = [...document.querySelectorAll<HTMLElement>('.context-spine>div')];
   const intro = document.querySelector<HTMLElement>('.intro');
   const scope = intro?.querySelector<HTMLElement>('.signal-scope');
   const scopeInput = scope?.querySelector<HTMLElement>('.scope-input');
@@ -57,6 +59,8 @@ export function setupSignal(signal: AbortSignal): void {
       contact?.style.setProperty('--resolve', '1');
       pipeline?.style.setProperty('--pipeline-progress', '1');
       steps.forEach(step => step.classList.add('is-current'));
+      spine?.style.setProperty('--spine-progress', '1');
+      milestones.forEach(item => item.classList.add('is-current'));
       return;
     }
     if (contact) {
@@ -73,6 +77,12 @@ export function setupSignal(signal: AbortSignal): void {
       const progress = boundedProgress(innerHeight * .62 - rect.top, 0, rect.height - 45);
       pipeline.style.setProperty('--pipeline-progress', String(progress));
       steps.forEach((step, index) => step.classList.toggle('is-current', progress >= index / 3));
+    }
+    if (spine) {
+      const rect = spine.getBoundingClientRect();
+      const progress = boundedProgress(innerHeight * .68 - rect.top, 0, rect.height);
+      spine.style.setProperty('--spine-progress', String(progress));
+      milestones.forEach(item => item.classList.toggle('is-current', item.getBoundingClientRect().top < innerHeight * .68));
     }
   };
   const schedule = () => {

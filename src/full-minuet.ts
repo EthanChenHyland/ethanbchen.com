@@ -4,6 +4,7 @@ type Note = { start: number; duration: number; pitch: number; hand: number };
 type FullScore = { duration: number; scoreEnd: number; noteCount: number; measureStarts: number[]; notes: Note[] };
 
 const stamp = (time: number) => `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(Math.floor(time % 60)).padStart(2, '0')}`;
+const pitchName = (pitch: number) => `${['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'][pitch % 12]}${Math.floor(pitch / 12) - 1}`;
 
 /** A native audio element is the clock; the score can follow or seek it both ways. */
 export function setupFullMinuet(signal: AbortSignal): void {
@@ -13,11 +14,17 @@ export function setupFullMinuet(signal: AbortSignal): void {
   const range = document.querySelector<HTMLInputElement>('#full-minuet-seek');
   const playButton = document.querySelector<HTMLButtonElement>('.full-minuet-play');
   const position = document.querySelector<HTMLOutputElement>('#full-minuet-position');
-  if (!audio || !viewport || !track || !range || !position || !playButton) return;
+  const speedButton = document.querySelector<HTMLButtonElement>('.full-minuet-speed');
+  const barLabel = document.querySelector<HTMLElement>('#full-minuet-bar');
+  const pitchLabel = document.querySelector<HTMLElement>('#full-minuet-pitches');
+  const shell = document.querySelector<HTMLElement>('.full-score-shell');
+  if (!audio || !viewport || !track || !range || !position || !playButton || !speedButton || !barLabel || !pitchLabel || !shell) return;
 
-  let frame = 0, releaseTimer = 0, scrubbing = false, dragging = false, dragX = 0;
+  let frame = 0, releaseTimer = 0, scrubbing = false, dragging = false, dragX = 0, draggedDistance = 0;
   let scoreWidth = 1, duration = 42.46, notes: Note[] = [], noteElements: HTMLElement[] = [];
-  let measures: number[] = [], markerElements: HTMLElement[] = [], lastHighlight = -1;
+  let measures: number[] = [], markerElements: HTMLElement[] = [], lastHighlight = -1, hoveredNote = -1;
+  const rates = [.75, 1, 1.25, 1.5];
+  let rateIndex = 1;
   let pendingSeek: number | null = null;
   const seek = (time: number) => {
     const value = Math.max(0, Math.min(duration, time));
@@ -33,10 +40,17 @@ export function setupFullMinuet(signal: AbortSignal): void {
     const bucket = Math.floor(time * 10);
     if (bucket !== lastHighlight) {
       lastHighlight = bucket;
+      const activePitches: number[] = [];
       noteElements.forEach((element, index) => {
         const note = notes[index];
-        element.classList.toggle('is-active', time >= note.start && time < note.start + note.duration);
+        const active = time >= note.start && time < note.start + note.duration;
+        element.classList.toggle('is-active', active);
+        if (active) activePitches.push(note.pitch);
       });
+      const bar = Math.min(32, Math.max(1, measures.findIndex((_, index) => index < 32 && time < measures[index + 1]) + 1 || 32));
+      barLabel.textContent = `BAR ${String(bar).padStart(2, '0')} / 32`;
+      if (hoveredNote < 0) pitchLabel.textContent = activePitches.length ? [...new Set(activePitches)].sort((a, b) => a - b).map(pitchName).join(' · ') : 'REST / RELEASE';
+      shell.style.setProperty('--score-energy', String(Math.min(1, activePitches.length / 4)));
     }
   };
   const tick = () => {
@@ -72,6 +86,12 @@ export function setupFullMinuet(signal: AbortSignal): void {
   };
 
   range.addEventListener('input', () => seek(Number(range.value)), { signal });
+  speedButton.addEventListener('click', () => {
+    rateIndex = (rateIndex + 1) % rates.length;
+    audio.playbackRate = rates[rateIndex];
+    speedButton.textContent = `${rates[rateIndex]}× SPEED`;
+    speedButton.setAttribute('aria-label', `Playback speed: ${rates[rateIndex]} times. Change playback speed`);
+  }, { signal });
   playButton.addEventListener('click', () => {
     if (audio.paused) void audio.play().catch(() => { playButton.textContent = 'AUDIO UNAVAILABLE'; });
     else audio.pause();
@@ -81,17 +101,31 @@ export function setupFullMinuet(signal: AbortSignal): void {
     update();
   }, { signal });
   for (const event of ['timeupdate', 'seeked', 'ended']) audio.addEventListener(event, () => update(), { signal });
-  audio.addEventListener('play', () => { playButton.textContent = 'PAUSE MINUET Ⅱ'; playButton.setAttribute('aria-label', 'Pause the complete Minuet'); wake(); }, { signal });
-  audio.addEventListener('pause', () => { playButton.textContent = 'PLAY MINUET ▶'; playButton.setAttribute('aria-label', 'Play the complete Minuet'); cancelAnimationFrame(frame); frame = 0; update(); }, { signal });
+  audio.addEventListener('play', () => { playButton.textContent = 'PAUSE MINUET Ⅱ'; playButton.setAttribute('aria-label', 'Pause the complete Minuet'); shell.classList.add('is-playing'); wake(); }, { signal });
+  audio.addEventListener('pause', () => { playButton.textContent = 'PLAY MINUET ▶'; playButton.setAttribute('aria-label', 'Play the complete Minuet'); shell.classList.remove('is-playing'); cancelAnimationFrame(frame); frame = 0; update(); }, { signal });
   document.addEventListener('visibilitychange', wake, { signal });
   viewport.addEventListener('pointerdown', event => {
-    scrubbing = true; dragging = event.pointerType === 'mouse'; dragX = event.clientX; clearTimeout(releaseTimer);
-    if (dragging) viewport.setPointerCapture(event.pointerId);
+    scrubbing = true; dragging = event.pointerType === 'mouse'; dragX = event.clientX; draggedDistance = 0; clearTimeout(releaseTimer);
   }, { signal });
   viewport.addEventListener('pointermove', event => {
     if (!dragging) return;
+    draggedDistance += Math.abs(event.clientX - dragX);
+    if (draggedDistance > 6 && !viewport.hasPointerCapture(event.pointerId)) viewport.setPointerCapture(event.pointerId);
     viewport.scrollLeft -= event.clientX - dragX;
     dragX = event.clientX;
+  }, { signal });
+  track.addEventListener('pointerover', event => {
+    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('.full-score-note') : null;
+    hoveredNote = target ? Number(target.dataset.index) : -1;
+    if (hoveredNote >= 0) pitchLabel.textContent = `${pitchName(notes[hoveredNote].pitch)} · ${notes[hoveredNote].hand === 0 ? 'RIGHT' : 'LEFT'} HAND · TAP TO SEEK`;
+  }, { signal });
+  track.addEventListener('pointerout', event => {
+    if (!(event.relatedTarget instanceof Element) || !event.relatedTarget.closest('.full-score-note')) { hoveredNote = -1; lastHighlight = -1; update(); }
+  }, { signal });
+  track.addEventListener('click', event => {
+    if (draggedDistance > 6 || !(event.target instanceof HTMLElement)) return;
+    const target = event.target.closest<HTMLElement>('.full-score-note');
+    if (target) seek(notes[Number(target.dataset.index)].start);
   }, { signal });
   window.addEventListener('pointerup', () => { if (scrubbing) { dragging = false;release(); } }, { signal });
   viewport.addEventListener('wheel', event => { if (Math.abs(event.deltaX) > 0) { scrubbing = true;release(); } }, { passive: true, signal });
@@ -119,12 +153,14 @@ export function setupFullMinuet(signal: AbortSignal): void {
     duration = score.duration;
     notes = score.notes;
     measures = score.measureStarts;
+    lastHighlight = -1;
     range.max = String(duration);
     const fragment = document.createDocumentFragment();
-    noteElements = notes.map(note => {
+    noteElements = notes.map((note, index) => {
       const element = document.createElement('span');
       element.className = 'full-score-note';
       element.dataset.hand = String(note.hand);
+      element.dataset.index = String(index);
       fragment.append(element);
       return element;
     });
