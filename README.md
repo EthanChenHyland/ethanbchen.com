@@ -36,7 +36,7 @@ Check the preview at desktop and narrow mobile widths, including keyboard naviga
 ## Architecture
 
 - `index.html` contains the homepage content, sections, accessible controls, and inline graphics; `src/style.css` defines layout, responsive styles, and local fonts.
-- `src/main.ts` initializes the interactions and their shared abort lifecycle. `explorers.ts` handles schema/channel controls, `piano.ts` synchronizes audio and the playhead, and `signal.ts` handles the page trace. `content.ts` holds shared copy and helpers.
+- `src/main.ts` initializes the interactions and their shared abort lifecycle. `explorers.ts` handles schema/channel controls, `full-minuet.ts` follows and seeks the complete MIDI rendering, `piano.ts` synchronizes the separate captured excerpt and its playhead, and `signal.ts` handles the page trace. `content.ts` holds shared copy and helpers.
 - `hero-field.ts` / `hero-webgl.ts` turn the actual DOM name into a pressure-sensitive point field with a scroll-to-trace shader.
 - `backdrop.ts` / `backdrop-webgl.ts` own the continuous Three.js camera route, ribbon shader, chapter structures, and native anchor navigation. Native scroll controls the timeline. Ribbons ripple automatically, pulses repeat, and chapter structures drift at rest; rendering is capped at 30fps on mobile and 60fps on desktop, pauses in hidden tabs, and is disabled for reduced motion.
 - `project-worlds.ts` / `project-worlds-webgl.ts` provide one scissored renderer for the contract planes, Clarity context layers, and captured MIDI notes. Visible scenes float and rotate gently; schema plates drift independently, Clarity routing waves travel, and score lighting breathes without changing note data or playback time. These loops are capped at 30fps mobile / 60fps desktop and stop offscreen or while hidden. DOM controls, keyboard rotation, raycast selection, and native audio remain accessible.
@@ -48,6 +48,7 @@ Check the preview at desktop and narrow mobile widths, including keyboard naviga
 - `public/` is served at the site root and copied into `dist/`: fonts, media, piano evidence, the resume, and the existing Pond static output under `public/github/`.
 - `tests/` contains Node unit tests. Selected `research/` documents record design direction, content verification, and asset provenance; local screenshots, logs, and scratch files are not published.
 - `scripts/build-evidence.py` derives the chroma SVG and inline score drawing from captured piano evidence. It writes `public/media/chroma.svg` **and `index.html`**; it is a separate maintenance tool, not part of the npm build.
+- `scripts/build-full-minuet.py` derives the 32-measure timeline and synthesized audio from the tracked MIDI/score sources in `research/`. It requires Python 3 and FFmpeg; run it only when changing those sources. The existing 12.3-second MIR capture is independent of this full-piece listening player.
 
 ## Deployment
 
