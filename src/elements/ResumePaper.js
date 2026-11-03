@@ -257,7 +257,8 @@ export class PaperEcosystem {
     this.balls.forEach((b, i) => (b.mesh = add(b.geo, paperMaterial(i ? '#efe7d8' : '#ebe8e1', { flat: true, lines: 2, seed: 11 + i }))));
     this.strips = [
       { ...makeStrip(2.3, 0.18), period: 21, phase: 0.2, r: 3.3, y: 6.9, w: 0.07, a0: 1.2 },
-      { ...makeStrip(1.8, 0.15), period: 27, phase: 0.7, r: 3.2, y: 3.4, w: -0.05, a0: 4.0 },
+      // its lane sits out past the margin tabs and below the aeroplane's
+      { ...makeStrip(1.8, 0.15), period: 27, phase: 0.7, r: 3.8, y: 3.0, w: -0.05, a0: 4.0 },
     ];
     this.strips.forEach((s) => (s.mesh = add(s.geo, paperMaterial(STOCK.tracing, { opacity: 0.55 }))));
     this.mini = { ...makeMiniPage(0.8, 1.05), period: 31, phase: 0.4, r: 3.0, y: 4.4, w: 0.05, a0: 3.4 };
@@ -279,11 +280,13 @@ export class PaperEcosystem {
     this._q2 = new THREE.Quaternion();
     this._e = new THREE.Euler();
     this.camDir = new THREE.Vector3(0, 0, 1);
+    this.pulse = 0;
   }
 
   /** Orbit point in the station frame, drawn in a little by hover and moved out of the page's way by focus. */
-  #orbit(out, r, y, angle, hk, fk) {
-    const rr = r * (1 - 0.08 * hk);
+  #orbit(out, r, y, angle, hk, fk, swell = 1) {
+    // a re-engagement pulse breathes compact pieces outward; long strips only curl (see update)
+    const rr = r * (1 - 0.08 * hk) * (1 + 0.07 * this.pulse * swell);
     out.set(Math.cos(angle) * rr, y, Math.sin(angle) * rr);
     return this.#clear(out, fk);
   }
@@ -304,8 +307,13 @@ export class PaperEcosystem {
     return p;
   }
 
+  /** Tumble at `amount` of each piece's rates. The phase is integrated, so a change of amount (hover, focus) changes speed, never the angle. */
   #tumble(mesh, time, rates, amount) {
-    this._e.set(time * rates[0] * amount, time * rates[1] * amount + rates[2], time * rates[2] * amount);
+    const u = mesh.userData;
+    u.tt = (u.tt ?? time) + (time - (u.tLast ?? time)) * amount;
+    u.tLast = time;
+    const kick = this.pulse * 0.35; // re-engagement: each piece twists a little and settles
+    this._e.set(u.tt * rates[0] + kick, u.tt * rates[1] + rates[2] + kick * 0.6, u.tt * rates[2] - kick * 0.8);
     mesh.quaternion.setFromEuler(this._e);
   }
 
@@ -345,19 +353,30 @@ export class PaperEcosystem {
   #resolve(obstacles, dt) {
     const items = [];
     const P = this.plane;
-    const rad = (m, k = 1) => (m.geometry.boundingSphere ?? (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere)).radius * k;
-    if (P.flying) items.push({ p: P.mesh.position, r: rad(P.mesh), plane: true });
-    else obstacles.push({ p: P.mesh.position, r: rad(P.mesh) });
-    for (const B of this.balls) items.push({ p: B.mesh.position, r: rad(B.mesh) });
-    items.push({ p: this.mini.mesh.position, r: rad(this.mini.mesh) });
-    for (const S of this.strips) items.push({ p: S.mesh.position, r: rad(S.mesh, 0.75) });
-    for (const S of this.scraps) items.push({ p: S.mesh.position, r: rad(S.mesh) });
+    const sphere = (m) => m.geometry.boundingSphere ?? (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere);
+    const rad = (m, k = 1) => sphere(m).radius * k;
+    // each piece is kept apart by its bounding sphere's true centre: the aeroplane is built from its
+    // tail and a curled strip's centre moves off its origin, so the origin alone can be half a body away
+    const item = (m, extra = {}) => ({ p: m.position, o: sphere(m).center.clone().applyQuaternion(m.quaternion), r: rad(m), ...extra });
+    if (P.flying) items.push(item(P.mesh, { plane: true }));
+    else {
+      const it = item(P.mesh);
+      obstacles.push({ p: it.p.clone().add(it.o), r: it.r });
+    }
+    for (const B of this.balls) items.push(item(B.mesh));
+    items.push(item(this.mini.mesh));
+    // strips are long: three quarters of their sphere is enough against compact pieces, but the
+    // aeroplane is kept clear of the whole of it
+    for (const S of this.strips) items.push(item(S.mesh, { r: rad(S.mesh, 0.75), rFull: rad(S.mesh) }));
+    for (const S of this.scraps) items.push(item(S.mesh));
+    const c = (a, out) => out.copy(a.p).add(a.o);
+    const ca = (this._ca ??= new THREE.Vector3()), cb = (this._cb ??= new THREE.Vector3());
     // corrections are eased in (about 0.2 s), so a piece meeting another bends its path smoothly
     // instead of kinking; record each piece's unresolved position first
     for (const a of items) a.raw = (a.rawV ??= new THREE.Vector3()).copy(a.p);
     const d = this._v;
     const push = (a, q, rq) => {
-      d.subVectors(a.p, q);
+      d.subVectors(c(a, ca), q);
       const dist = d.length();
       const min = a.r + rq + GAP;
       if (dist >= min) return;
@@ -368,18 +387,19 @@ export class PaperEcosystem {
     for (let pass = 0; pass < 2; pass++) {
       items.forEach((a, i) => {
         for (const o of obstacles) push(a, o.p, o.r);
-        for (let j = 0; j < i; j++) push(a, items[j].p, items[j].r);
-        const h = Math.hypot(a.p.x, a.p.z) || 1e-4;
+        for (let j = 0; j < i; j++) push(a, c(items[j], cb), items[j].r);
+        c(a, ca);
+        const h = Math.hypot(ca.x, ca.z) || 1e-4;
         // the aeroplane's own path already leaves and lands radially at the page edge
-        const inBand = a.p.y > SHEET_Y0 - a.r && a.p.y < SHEET_Y1 + a.r;
+        const inBand = ca.y > SHEET_Y0 - a.r && ca.y < SHEET_Y1 + a.r;
         const lo = !a.plane && inBand ? SHEET_R + a.r : 0;
         const hi = CAP_R - a.r * 0.5;
         const target = THREE.MathUtils.clamp(h, lo, hi);
         if (target !== h) {
-          a.p.x *= target / h;
-          a.p.z *= target / h;
+          a.p.x += ca.x * (target / h - 1);
+          a.p.z += ca.z * (target / h - 1);
         }
-        a.p.y = Math.max(a.p.y, a.r + 0.15);
+        a.p.y += Math.max(0, a.r + 0.15 - ca.y);
       });
     }
     for (const a of items) {
@@ -387,10 +407,29 @@ export class PaperEcosystem {
       this._offsets.set(a.p, o.lerp(d.subVectors(a.p, a.raw), Math.min(1, dt * 5)));
       a.p.copy(a.raw).add(o);
     }
+    // whatever the easing has not yet cleared from a higher-priority piece (the aeroplane above all,
+    // which moves fastest) is cleared now; the overlap only ever grows from zero, so this stays
+    // continuous, a gentle bump rather than a jump
+    items.forEach((a, i) => {
+      let moved = false;
+      for (let j = 0; j < i; j++) {
+        d.subVectors(c(a, ca), c(items[j], cb));
+        const dist = d.length(), min = (items[j].plane ? a.rFull ?? a.r : a.r) + items[j].r + GAP;
+        if (dist < min && dist > 1e-4) {
+          a.p.addScaledVector(d, (min - dist) / dist);
+          moved = true;
+        }
+      }
+      if (moved) this._offsets.get(a.p).subVectors(a.p, a.raw);
+    });
   }
 
-  update(time, dt, { hk, fk, tip, camera, stylusMid, stylusEnd, slips }) {
-    const steady = (1 - 0.6 * hk) * (1 - 0.75 * fk);
+  update(time, dt, { hk, fk, tip, camera, stylusMid, stylusEnd, slips, life = 0, pulse = 0 }) {
+    // focused-idle life lets some of the focused calm go (activity only: what clears the page from
+    // the camera still follows fk in full); a re-engagement pulse wakes everything briefly
+    this.pulse = pulse;
+    const fa = fk * (1 - 0.45 * life);
+    const steady = (1 - 0.6 * hk) * (1 - 0.75 * fa) * (1 + 0.8 * pulse);
     this.camDir.copy(camera).setY(0).normalize();
     const flutter = (mesh, i) => {
       const near = Math.exp(-mesh.position.distanceToSquared(tip) * 1.5);
@@ -474,7 +513,7 @@ export class PaperEcosystem {
     this.balls.forEach((B, i) => {
       const ph = (time / B.period + B.phase) % 1;
       const openK = swell(ph, 0.5, 0.62, 0.82, 0.94);
-      B.set((B.k = 1 - 0.88 * openK * (1 - fk)));
+      B.set((B.k = 1 - 0.88 * openK * (1 - fa)));
       const ang = B.a0 + time * B.w;
       const y = THREE.MathUtils.lerp(B.y + B.bob * Math.sin(time * 0.4 + i * 2), 1.5 + i * 0.5, fk * 0.6);
       this.#orbit(B.mesh.position, B.r, y, ang, hk, fk);
@@ -485,8 +524,8 @@ export class PaperEcosystem {
     // ---- tracing-paper strips: drift high, curl and straighten
     this.strips.forEach((S, i) => {
       const ph = (time / S.period + S.phase) % 1;
-      S.set(0.12 + 0.85 * swell(ph, 0.08, 0.36, 0.58, 0.88));
-      this.#orbit(S.mesh.position, S.r, S.y + 0.4 * Math.sin(time * 0.3 + i * 3), S.a0 + time * S.w, hk, fk);
+      S.set(Math.min(1, 0.12 + 0.85 * swell(ph, 0.08, 0.36, 0.58, 0.88) + 0.25 * pulse));
+      this.#orbit(S.mesh.position, S.r, S.y + 0.4 * Math.sin(time * 0.3 + i * 3), S.a0 + time * S.w, hk, fk, 0);
       this.#tumble(S.mesh, time, [0.12, 0.2 + i * 0.05, 0.09], steady);
       flutter(S.mesh, i + 3);
     });
@@ -495,7 +534,7 @@ export class PaperEcosystem {
     {
       const M = this.mini;
       const ph = (time / M.period + M.phase) % 1;
-      M.set((M.k = 1 - swell(ph, 0.2, 0.38, 0.62, 0.8) * (1 - fk)));
+      M.set((M.k = 1 - swell(ph, 0.2, 0.38, 0.62, 0.8) * (1 - fa)));
       this.#orbit(M.mesh.position, M.r, M.y + 0.6 * Math.sin(time * 0.27), M.a0 + time * M.w, hk, fk);
       this.#tumble(M.mesh, time, [0.1, 0.16, 0.13], steady);
       flutter(M.mesh, 5);

@@ -155,6 +155,12 @@ export class Resume {
     this.group.add(this.hit);
 
     this.yaw = null;
+    this.life = 0;
+    this.pulse = 0;
+    this.pulseHold = 0;
+    this.drift = 0;
+    this.focusDir = null;
+    this._att = new THREE.Vector3();
     this._v = new THREE.Vector3();
     this._p = new THREE.Vector3();
     this._n = new THREE.Vector3();
@@ -308,17 +314,18 @@ export class Resume {
   #buildSlips() {
     const tab = { w: 0.6, h: 0.26, band: 0.36, lines: 1 };
     this.slips = [
-      { ...tab, u: 1, v: 0.76, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#b98b4e', period: 19, phase: 0.1, drift: [2.35, 1.06, 0.1] },
-      { ...tab, u: 1, v: 0.5, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#3a3836', period: 26, phase: 0.55, drift: [2.6, 0.3, -0.2] },
-      { ...tab, u: 1, v: 0.27, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#9a4a35', period: 33, phase: 0.8, drift: [2.3, -0.47, 0.15] },
-      { w: 0.82, h: 0.54, band: 0, lines: 3, u: 0, v: 0.6, ox: -1, oy: 0, z: 0.016, rot: -0.1, color: STOCK.warm, bandColor: '#000000', period: 23, phase: 0.35, drift: [-2.45, 0.45, 0.0] },
-      { w: 0.74, h: 0.44, band: 0.12, lines: 2, u: 0, v: 0.2, ox: -1, oy: 0, z: -0.012, rot: 0.05, color: '#d4d2cb', bandColor: '#3a3836', period: 41, phase: 0.2, drift: [-2.25, -1.45, 0.1] },
+      { ...tab, u: 1, v: 0.76, ox: 1, oy: 0, z: -0.03, rot: 0, color: '#e6dccb', bandColor: '#b98b4e', period: 19, phase: 0.1, drift: [2.35, 1.06, 0.1] },
+      { ...tab, u: 1, v: 0.5, ox: 1, oy: 0, z: -0.03, rot: 0, color: '#e6dccb', bandColor: '#3a3836', period: 26, phase: 0.55, drift: [2.6, 0.3, -0.2] },
+      { ...tab, u: 1, v: 0.27, ox: 1, oy: 0, z: -0.03, rot: 0, color: '#e6dccb', bandColor: '#9a4a35', period: 33, phase: 0.8, drift: [2.3, -0.47, 0.15] },
+      { w: 0.82, h: 0.54, band: 0, lines: 3, u: 0, v: 0.6, ox: -1, oy: 0, z: 0.03, rot: -0.1, color: STOCK.warm, bandColor: '#000000', period: 23, phase: 0.35, drift: [-2.45, 0.45, 0.0] },
+      { w: 0.74, h: 0.44, band: 0.12, lines: 2, u: 0, v: 0.2, ox: -1, oy: 0, z: -0.03, rot: 0.05, color: '#d4d2cb', bandColor: '#3a3836', period: 41, phase: 0.2, drift: [-2.25, -1.45, 0.1] },
     ];
     const overlap = 0.1; // how far each piece tucks under or over the page
     this.slips.forEach((d, i) => {
       const geo = new THREE.PlaneGeometry(d.w, d.h, 10, 2);
       const pa = geo.attributes.position;
-      for (let k = 0; k < pa.count; k++) pa.setZ(k, 0.05 * (pa.getX(k) / d.w) ** 2); // a slight natural bow
+      // a slight natural bow, away from the page whichever side of it the slip sits
+      for (let k = 0; k < pa.count; k++) pa.setZ(k, Math.sign(d.z) * 0.05 * (pa.getX(k) / d.w) ** 2);
       geo.computeVertexNormals();
       const mat = paperMaterial(d.color, { lines: d.lines, band: d.band, bandColor: d.bandColor, seed: i * 7.31 });
       const mesh = new THREE.Mesh(geo, mat);
@@ -342,6 +349,18 @@ export class Resume {
 
   #stepSlips(time, dt, hk, fk) {
     const P = this._p, N = this._n, T = this._T, Bv = this._Bv;
+    // loose paper this frame, in the folio's frame, for the slips to give way to
+    const toFolio = (this._toFolio ??= new THREE.Matrix4()).copy(this.folio.matrix).invert();
+    const pp = this.paper;
+    const loose = [pp.mini.mesh, ...pp.balls.map((b) => b.mesh), ...pp.strips.map((x) => x.mesh), ...pp.scraps.map((x) => x.mesh), ...(pp.plane.flying ? [pp.plane.mesh] : [])].map((m, i) => {
+      const L = ((this._loose ??= [])[i] ??= { p: new THREE.Vector3(), r: 0 });
+      // the bounding sphere's own centre: curled strips and folded pieces are not centred on their origin
+      const bs = m.geometry.boundingSphere ?? (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere);
+      m.updateMatrix();
+      L.p.copy(bs.center).applyMatrix4(m.matrix).applyMatrix4(toFolio);
+      L.r = bs.radius;
+      return L;
+    });
     this.slips.forEach((d, i) => {
       // its own slow cycle: on the margin, peel away, drift, return
       const ph = (time / d.period + d.phase) % 1;
@@ -349,7 +368,9 @@ export class Resume {
       a *= 1 - 0.55 * hk;
       // while the page is being read, the annotation slip alone lifts now and then
       const read = i === 3 ? 0.18 * (sstep(0, 0.15, (time / 13) % 1) - sstep(0.35, 0.5, (time / 13) % 1)) : 0;
-      a = THREE.MathUtils.lerp(a, read, fk);
+      a = THREE.MathUtils.lerp(a, read, fk * (1 - 0.4 * this.life));
+      // re-engagement: every slip lifts a little off its margin, then settles
+      a = Math.min(1, a + 0.22 * this.pulse);
       d.a = a;
 
       // attached pose: on the page surface at its margin, in the page's own frame
@@ -372,14 +393,37 @@ export class Resume {
       const drift = this._d.copy(d.drift).add(this._p.set(0.25 * Math.sin(time * 0.37 + s), 0.3 * Math.sin(time * 0.29 + s * 2), 0.25 * Math.sin(time * 0.41 + s * 3)));
       this._qb.copy(this._qa).multiply(this._qc.setFromEuler(this._e.set(0.5 * Math.sin(time * 0.4 + s), 0.6 * Math.sin(time * 0.23 + s) + 0.4, 0.3 * Math.sin(time * 0.31 + s))));
 
-      // the angle leads the position, so it peels before it travels
+      // it peels first (its free edge lifts about the page edge), arcs out on its own side of
+      // the page, and only tumbles once it is clear
       const pk = smooth(a);
-      d.mesh.position.copy(attached).lerp(drift, pk);
-      d.mesh.quaternion.slerpQuaternions(this._qa, this._qb, Math.sqrt(a));
-      // a little lift of the free edge, and a flutter when the stylus passes close
+      const out = Math.sign(d.z);
+      d.mesh.position.copy(attached).lerp(drift, pk).addScaledVector(N, out * 0.4 * Math.sin(Math.PI * pk));
+      d.mesh.quaternion.slerpQuaternions(this._qa, this._qb, sstep(0.15, 0.75, a));
+      // the lift and the stylus flutter hinge on the page edge and only ever open outward
       const near = Math.exp(-d.mesh.position.distanceToSquared(this.tipPos) * 3);
-      const lift = Math.sin(Math.min(a * 2.5, 1) * Math.PI) * 0.45 + near * 0.12 * Math.sin(time * 13 + i);
-      d.mesh.quaternion.multiply(this._qc.setFromAxisAngle(this._p.set(0, 1, 0), lift * (d.ox || 1)));
+      const lift = Math.sin(Math.min(a * 2.5, 1) * Math.PI) * 0.45 + near * 0.12 * (0.5 + 0.5 * Math.sin(time * 13 + i));
+      const hinge = this._qc.setFromAxisAngle(Bv, -d.ox * out * lift);
+      const pivot = P.addScaledVector(N, d.z);
+      d.mesh.position.sub(pivot).applyQuaternion(this._q.copy(hinge).slerp((this._qId ??= new THREE.Quaternion()), pk)).add(pivot);
+      d.mesh.quaternion.premultiply(hinge);
+      // a slip gives way to the stylus body and to passing loose paper (eased, so it bends its
+      // path rather than jumps): fully while drifting, a little while on its margin
+      const rs = Math.hypot(d.w, d.h) * 0.5;
+      const give = sstep(0.02, 0.2, a);
+      const push = (this._push ??= new THREE.Vector3()).set(0, 0, 0);
+      const sa = this.tipPos, sb = this._T.copy(this.tipDir).multiplyScalar(1.2 * STYLUS_SCALE);
+      const k = THREE.MathUtils.clamp(this._Bv.subVectors(d.mesh.position, sa).dot(sb) / sb.lengthSq(), 0, 1);
+      const away = this._Bv.sub(sb.multiplyScalar(k));
+      let dist = away.length();
+      if (dist < rs + 0.08 && dist > 1e-4) push.addScaledVector(away, ((rs + 0.08 - dist) / dist) * (0.5 + 0.5 * give));
+      for (const L of loose) {
+        away.subVectors(d.mesh.position, L.p);
+        dist = away.length();
+        const need = rs + L.r + 0.03;
+        if (dist < need && dist > 1e-4) push.addScaledVector(away, ((need - dist) / dist) * (0.5 + 0.5 * give));
+      }
+      (d.avoid ??= new THREE.Vector3()).lerp(push, Math.min(1, dt * 6));
+      d.mesh.position.add(d.avoid);
     });
   }
 
@@ -693,6 +737,41 @@ export class Resume {
     return pen;
   }
 
+  // ---------------------------------------------------------------- attention
+
+  /**
+   * Focused-idle life: once the focused view has settled, how far the camera has since wandered
+   * from that composition (its idle orbit, or the user's own orbit) brings some paper activity
+   * back. While a reframe flight returns it, drift reads as zero and the life eases away.
+   */
+  #stepAttention(dt, camera, focused, fk) {
+    const rig = this.ctx.app.rig;
+    let drift = 0;
+    if (focused && !rig.busy && fk > 0.98) {
+      const off = this._att.subVectors(camera.position, rig.controls.target).normalize();
+      if (!this.focusDir) this.focusDir = off.clone();
+      drift = THREE.MathUtils.radToDeg(this.focusDir.angleTo(off));
+    } else if (!focused) this.focusDir = null;
+    this.drift = drift;
+    this.life += (sstep(12, 45, drift) - this.life) * Math.min(1, dt * 0.4);
+    // one retriggerable envelope: a quick rise, a short hold, a soft decay
+    if (this.pulseHold > 0) {
+      this.pulseHold -= dt;
+      this.pulse += (1 - this.pulse) * Math.min(1, dt * 7);
+    } else this.pulse *= Math.exp(-dt / 0.9);
+    if (!focused) this.pulse = Math.min(this.pulse, 1) * Math.exp(-dt * 3);
+  }
+
+  /**
+   * The focused page was selected again, and the camera is reframing it. If the view had wandered
+   * well away first, the paper wakes for a moment alongside the reframe and settles as the
+   * composition returns. A pulse still under way is not stacked.
+   */
+  onReframe() {
+    if (this.drift < 25 || this.life < 0.45 || this.pulse >= 0.35) return;
+    this.pulseHold = 0.35;
+  }
+
   // ---------------------------------------------------------------- atmosphere
 
   /** Dust hanging in the stylus light: the fire's ray-marched volume, re-densified around the tip. */
@@ -923,8 +1002,9 @@ export class Resume {
       if (!(this.mode === 'write' && i === this.line)) this.lineInk[i] = Math.max(0, this.lineInk[i] - this.lineFade[i] * dt * fade);
     }
 
+    this.#stepAttention(dt, camera, focused, fk);
     this.group.worldToLocal(this._cam.copy(camera.position));
-    this.paper.update(time, dt, { hk, fk, tip: this.tipGroup, camera: this._cam, stylusMid: this.stylusMid, stylusEnd: this.stylusEnd, slips: this.slips });
+    this.paper.update(time, dt, { hk, fk, tip: this.tipGroup, camera: this._cam, stylusMid: this.stylusMid, stylusEnd: this.stylusEnd, slips: this.slips, life: this.life, pulse: this.pulse });
     const pen = this.#stepStylus(dt, time, hk, focused);
     this.#stepSlips(time, dt, hk, fk);
     for (const mk of this.marks) if (!(this.mode === 'mark' && mk === this.marks[this.markSlot])) mk.w = Math.max(0, mk.w - dt * 0.025);

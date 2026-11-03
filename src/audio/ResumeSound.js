@@ -20,6 +20,8 @@ const WRITING = ['write', 'final', 'mark', 'note'];
 // takes the station's trim here
 const AIR_TRIM = 0.8;
 const GRAIN_GAIN = 6;
+// the continuous graphite scratch, about 5 dB under its first level (0.75 × 0.75)
+const SCRATCH = 0.5625;
 
 export class ResumeSound {
   constructor(ctx, out, { white, pink, brown }, master) {
@@ -272,7 +274,7 @@ export class ResumeSound {
     if (!pen && p.pen) this.#lift(t);
     p.pen = this.pen = pen;
     // focused on the page, the writing is at its most intimate
-    const scratch = pen ? (0.18 + 0.26 * this.speed) * (1 + 0.15 * fk) : 0;
+    const scratch = pen ? SCRATCH * (0.18 + 0.26 * this.speed) * (1 + 0.15 * fk) : 0;
     this.scratch.gain.setTargetAtTime(scratch, now, pen ? 0.025 : 0.05);
 
     // the paper layer quietens while the page is being read
@@ -364,13 +366,20 @@ export class ResumeSound {
     this.rustle.trans = Math.max((this.rustle.trans ?? 0) * Math.exp(-dtf / 1.2), change);
     const excess = Math.max(0, this.rustle.activity - this.rustle.base - 0.05) * this.rustle.trans;
     const move = Math.min(1, Math.max(change, excess * 2.5)) * (hv < -0.05 ? 0.6 : 1) * (1 - fk);
+    // a re-engagement pulse in focus moves the same paper, through the same layers; the paper
+    // layer is calmed in focus, so it is lifted here to stay a clear (short) response
+    const pulse = el.pulse ?? 0;
+    const lift = pulse > move ? 1 + 0.6 * fk : 1;
     // quick to rise, slower to settle
     this.rustle.move += (move - this.rustle.move) * Math.min(1, dtf * (move > this.rustle.move ? 8 : 2.2));
     const mv = this.rustle.move;
-    this.moveRush.gain.setTargetAtTime(0.55 * mv, now, 0.05);
-    this.moveFlutter.gain.setTargetAtTime(0.27 * mv, now, 0.05);
+    const mvp = Math.max(mv, 0.85 * pulse);
+    this.moveRush.gain.setTargetAtTime(0.55 * mvp * lift, now, 0.05);
+    this.moveFlutter.gain.setTargetAtTime(0.27 * mvp * lift, now, 0.05);
     this.moveBand.frequency.setTargetAtTime(900 + 700 * mv, now, 0.1);
-    this.rustle.hover = hk;
+    // micro rustles: hover, a little of the focused-idle life, and the pulse
+    this.rustle.hover = Math.max(hk, 0.3 * (el.life ?? 0) * fk, pulse);
+    this.rustle.pulse = pulse;
 
     this.level = { air: airLevel, crumple: body, rub, hover: this.rustle.hover, activity: this.rustle.activity, move: this.rustle.move };
   }
