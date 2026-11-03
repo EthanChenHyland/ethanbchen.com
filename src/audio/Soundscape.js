@@ -3,8 +3,8 @@ import { ResumeSound } from './ResumeSound.js';
 
 /**
  * Fully procedural ambience (no audio files): the self-writing
- * document at Resume (see ResumeSound), and for now the original wind, water and
- * earth voices at the stations that still run those elements. Each station has its
+ * document at Resume (see ResumeSound), and for now the original water and earth
+ * voices at the stations that still run those elements. Each station has its
  * own bus whose gain and stereo pan follow the camera.
  */
 export class Soundscape {
@@ -129,31 +129,14 @@ export class Soundscape {
     // ---- resume: stylus on paper and the paper around it ----
     this.resume = new ResumeSound(ctx, this.bus.resume, { white: this.white, pink, brown }, this.master);
 
-    // ---- air: two sweeping band-passed winds + a faint whistle ----
-    const windA = this.#filter('bandpass', 520, 0.9);
-    const windAGain = this.#gain(0.55);
-    this.#loop(pink).connect(windA).connect(windAGain).connect(this.bus.experience);
-    this.#lfo(0.07, 260, windA.frequency);
-    this.#lfo(0.11, 0.3, windAGain.gain);
-    const windB = this.#filter('bandpass', 1300, 2.5);
-    const windBGain = this.#gain(0.2);
-    this.#loop(pink).connect(windB).connect(windBGain).connect(this.bus.experience);
-    this.#lfo(0.05, 500, windB.frequency);
-    this.#lfo(0.17, 0.15, windBGain.gain);
-    const whistle = ctx.createOscillator();
-    whistle.frequency.value = 880;
-    const whistleGain = this.#gain(0.0);
-    whistle.connect(whistleGain).connect(this.bus.experience);
-    whistle.start();
-    this.#lfo(0.09, 40, whistle.frequency);
-    this.#lfo(0.13, 0.012, whistleGain.gain);
+    // ---- projects (the console): silent until its own voice exists; Air's wind went with the vortex ----
 
-    // ---- water: babbling band-pass + scheduled droplet "bloops" ----
+    // ---- experience, still the water placeholder: babbling band-pass + scheduled droplet "bloops" ----
     this.babble = this.#filter('bandpass', 700, 3.5);
     const babbleGain = this.#gain(0.32);
-    this.#loop(pink).connect(this.babble).connect(babbleGain).connect(this.bus.projects);
+    this.#loop(pink).connect(this.babble).connect(babbleGain).connect(this.bus.experience);
     this.drops = this.#gain(0.5);
-    this.drops.connect(this.bus.projects);
+    this.drops.connect(this.bus.experience);
 
     // ---- earth: deep rumble + occasional stone knocks ----
     const rumbleGain = this.#gain(0.9);
@@ -212,7 +195,7 @@ export class Soundscape {
     const now = this.ctx.currentTime;
     this._right.set(1, 0, 0).applyQuaternion(camera.quaternion);
     // Resume sits about 2 dB under its earlier level (0.9): present, not dominant
-    const base = { resume: 0.72, experience: 0.75, projects: 0.85, profile: 0.8 };
+    const base = { resume: 0.72, experience: 0.85, projects: 0.75, profile: 0.8 };
     for (const el of elements) {
       const id = el.def.id;
       if (id === 'resume') this.resume.update(el, camera, this._right);

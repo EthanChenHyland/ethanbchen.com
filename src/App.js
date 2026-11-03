@@ -9,11 +9,12 @@ import { PostFX } from './fx/PostFX.js';
 import { CameraRig } from './core/CameraRig.js';
 import { Resume } from './elements/Resume.js';
 import { Water } from './elements/Water.js';
-import { Air } from './elements/Air.js';
+import { Projects } from './elements/Projects.js';
 import { Earth } from './elements/Earth.js';
 
-// Resume replaces Fire; the other destinations still run the original elements.
-const ELEMENT_CLASSES = { resume: Resume, experience: Air, projects: Water, profile: Earth };
+// Resume replaces Fire and Projects (the Threshold Console) replaces Air; Experience and Profile
+// still run the original Water and Earth elements as placeholders.
+const ELEMENT_CLASSES = { resume: Resume, projects: Projects, experience: Water, profile: Earth };
 const UP = new THREE.Vector3(0, 1, 0);
 
 const QUALITY = {
@@ -44,9 +45,16 @@ const RECOMPOSE = {
 };
 
 // The same recomposition while a station is focused, around its own settled focus view: a camera
-// left more than about 20° above it, or well outside the dead zone in distance, drifts back to it.
+// left more than `trigger` above it, or well outside the dead zone in distance, drifts back to it.
 // No breathing (the focus orbit is its own motion). Only stations listed here take part.
-const FOCUS_RECOMPOSE = { resume: { trigger: THREE.MathUtils.degToRad(20) } };
+// Resume: about 20° up, the standing page stops reading as a page. Projects (the console): the
+// screen tilts back and stays readable to about 30° absolute, after which the brow covers it; its
+// focus view is closer, and it reads well down to ~0.8× that distance, so its dead zone is a little
+// wider. Experience (still the Water placeholder) and Profile keep the original focus behaviour.
+const FOCUS_RECOMPOSE = {
+  resume: { trigger: THREE.MathUtils.degToRad(20) },
+  projects: { trigger: THREE.MathUtils.degToRad(24), deadZone: 0.2 },
+};
 
 export class App {
   constructor(canvas, { onProgress } = {}) {
@@ -230,7 +238,8 @@ export class App {
       const v = this.focusView(id);
       const radius = v.pos.distanceTo(v.target);
       const elevation = Math.asin((v.pos.y - v.target.y) / radius);
-      return { ...RECOMPOSE, elevation, radius, trigger: elevation + FOCUS_RECOMPOSE[id].trigger, breathElev: 0, breathRadius: 0 };
+      const own = FOCUS_RECOMPOSE[id];
+      return { ...RECOMPOSE, deadZone: own.deadZone ?? RECOMPOSE.deadZone, elevation, radius, trigger: elevation + own.trigger, breathElev: 0, breathRadius: 0 };
     })());
   }
 

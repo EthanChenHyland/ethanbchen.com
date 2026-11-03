@@ -6,10 +6,13 @@ export const PLATFORM_RADIUS = 12.0;
 
 const deg = THREE.MathUtils.degToRad;
 
-// The four destinations keep the original station slots (Resume takes Fire's,
-// Experience Air's, Projects Water's, Profile Earth's). Array order is the dock
-// and arrow-key order, and it runs contiguously around the ring.
+// The four destinations keep the original station slots: Resume takes Fire's (front left),
+// Projects Air's (front right, the Threshold Console), Experience Water's (back right, still the
+// Water element as a placeholder) and Profile Earth's (back left). Array order is the dock and
+// arrow-key order, and it runs contiguously around the ring.
 //
+// Slot properties (azimuth, view, envGlow, color, glyph) belong to the physical station in the
+// slot; identity properties (name, panel copy, url) to the destination.
 // `glyph` names the station's symbol: Resume has its own; the others still borrow an
 // element's triangle until their glyphs exist.
 // `url` is where "Open" leads (internal path or external address); leave it
@@ -55,31 +58,12 @@ export const ELEMENTS = [
     view: { distance: 9.8, height: 4.4, swing: deg(-18), targetY: 3.35 },
   },
   {
-    id: 'projects',
+    id: 'experience',
     key: '3',
-    name: 'Projects',
+    name: 'Experience',
     glyph: 'water',
     color: '#5fc9b0',
     azimuth: deg(135),
-    eyebrow: 'Selected works',
-    subtitle: 'Products · systems · interactive software',
-    motto: 'Things I have built',
-    text: 'A small set of products and experiments, from tools people use to systems built to understand how something works.',
-    facts: [
-      ['Focus', 'Interactive systems'],
-      ['Featured', 'Carat Coin'],
-    ],
-    url: '/projects/',
-    envGlow: { intensity: 2.2, size: 6, y: 5 },
-    view: { distance: 9.0, height: 4.0, swing: deg(18), targetY: 2.95 },
-  },
-  {
-    id: 'experience',
-    key: '4',
-    name: 'Experience',
-    glyph: 'air',
-    color: '#e3684d',
-    azimuth: deg(45),
     eyebrow: 'Professional journey',
     subtitle: 'Roles · internships · impact',
     motto: 'Where I have worked',
@@ -89,6 +73,25 @@ export const ELEMENTS = [
       ['Interned', 'Cleveland Clinic'],
     ],
     url: '/experience/',
+    envGlow: { intensity: 2.2, size: 6, y: 5 },
+    view: { distance: 9.0, height: 4.0, swing: deg(18), targetY: 2.95 },
+  },
+  {
+    id: 'projects',
+    key: '4',
+    name: 'Projects',
+    glyph: 'air',
+    color: '#e3684d',
+    azimuth: deg(45),
+    eyebrow: 'Selected works',
+    subtitle: 'Products · systems · experiments',
+    motto: 'Things I have built',
+    text: 'Major projects and a workshop of experiments: tools people use, and systems built to understand how something works.',
+    facts: [
+      ['Featured', 'Great Prompt-Off'],
+      ['Also', 'Mosaic · TowerLogic'],
+    ],
+    url: '/projects/',
     envGlow: null,
     view: { distance: 10.4, height: 4.3, swing: deg(-16), targetY: 3.3 },
   },
