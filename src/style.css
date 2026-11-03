@@ -90,7 +90,7 @@ kbd {
   font-size: 25px;
   letter-spacing: 0.42em;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #ffb27a 0%, #e8f3ff 38%, #7fd0ff 62%, #9be38f 100%);
+  background: linear-gradient(90deg, #f3d6a6 0%, #efe6f6 34%, #bfa6ee 58%, #8fd8c4 80%, #f0a08a 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -228,7 +228,7 @@ kbd {
   letter-spacing: 0.08em;
   color: var(--text);
 }
-.info__greek {
+.info__sub {
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--accent);
@@ -269,6 +269,14 @@ kbd {
   margin: 4px 0 0;
   font-size: 14px;
   color: var(--text);
+}
+.info .info__open {
+  display: flex;
+  margin: 0 0 8px;
+  text-decoration: none;
+}
+.info .info__open[hidden] {
+  display: none;
 }
 .info__nav {
   display: flex;
@@ -454,7 +462,7 @@ kbd {
   display: block;
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #ff7a2f, #bfe4ff, #2aa9ff, #6fd66a);
+  background: linear-gradient(90deg, #e8c48a, #c39ef0, #5fc9b0, #e3684d);
   transition: width 0.5s var(--ease);
 }
 @keyframes spin {

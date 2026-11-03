@@ -1,6 +1,6 @@
 import { ELEMENTS } from '../config.js';
 
-/** Inline SVG of the alchemical symbol for an element (or the "all" sigil). */
+/** Inline SVG of a station's placeholder symbol (a glyph name from config, or the "all" sigil). */
 export function glyphSVG(id) {
   const attrs = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"';
   if (id === 'all') {
@@ -11,8 +11,6 @@ export function glyphSVG(id) {
   const bar = id === 'air' ? '<path d="M3.6 12.6h16.8"/>' : id === 'earth' ? '<path d="M3.6 11.4h16.8"/>' : '';
   return `<svg ${attrs}><path d="${tri}"/>${bar}</svg>`;
 }
-
-const ORDINALS = ['The first element', 'The second element', 'The third element', 'The fourth element'];
 
 export class UI {
   constructor(app, soundscape) {
@@ -25,7 +23,7 @@ export class UI {
     this.tooltip = this.$('tooltip');
     this.hint = this.$('hint');
     this.pointer = { x: 0, y: 0, down: null, dirty: false };
-    // only offer elements that exist (debug URLs like ?only=fire build a single one)
+    // only offer stations that exist (debug URLs like ?only=resume build a single one)
     this.available = ELEMENTS.filter((d) => app.elements.some((e) => e.def.id === d.id));
     this.#buildDock();
     this.#bind();
@@ -41,7 +39,7 @@ export class UI {
     ring.innerHTML = ELEMENTS.map((d, i) => {
       const a = (i / ELEMENTS.length) * Math.PI * 2 - Math.PI / 2;
       const x = Math.cos(a) * 36, y = Math.sin(a) * 36;
-      return `<span style="transform: translate(${x.toFixed(1)}px, ${y.toFixed(1)}px); color:${d.color}; animation-delay:${i * 0.3}s">${glyphSVG(d.id)}</span>`;
+      return `<span style="transform: translate(${x.toFixed(1)}px, ${y.toFixed(1)}px); color:${d.color}; animation-delay:${i * 0.3}s">${glyphSVG(d.glyph)}</span>`;
     }).join('');
   }
 
@@ -58,9 +56,9 @@ export class UI {
   }
 
   #buildDock() {
-    const all = `<button data-focus="all" class="is-active" style="--c:#e9dcc0" aria-pressed="true" title="Overview (0)">${glyphSVG('all')}<span class="dock__label">Sanctum</span></button><span class="dock__sep" aria-hidden="true"></span>`;
+    const all = `<button data-focus="all" class="is-active" style="--c:#e9dcc0" aria-pressed="true" title="Overview (0)">${glyphSVG('all')}<span class="dock__label">Overview</span></button><span class="dock__sep" aria-hidden="true"></span>`;
     const items = this.available.map(
-      (d) => `<button data-focus="${d.id}" style="--c:${d.color}" aria-pressed="false" title="${d.name} (${d.key})">${glyphSVG(d.id)}<span class="dock__label">${d.name}</span><kbd>${d.key}</kbd></button>`,
+      (d) => `<button data-focus="${d.id}" style="--c:${d.color}" aria-pressed="false" title="${d.name} (${d.key})">${glyphSVG(d.glyph)}<span class="dock__label">${d.name}</span><kbd>${d.key}</kbd></button>`,
     ).join('');
     this.dock.innerHTML = all + items;
   }
@@ -81,6 +79,13 @@ export class UI {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       const def = this.available.find((d) => d.key === k);
+      if (k === 'enter') {
+        // a focused button or link handles Enter itself
+        const t = document.activeElement;
+        if (t && t !== document.body && t !== app.canvas) return;
+        this.#open();
+        return;
+      }
       if (def) app.focus(def.id);
       else if (k === 'escape' || k === '0') app.focus('all');
       else if (k === 'arrowright') this.#step(1);
@@ -180,21 +185,44 @@ export class UI {
       this.info.setAttribute('aria-hidden', 'true');
       return;
     }
-    const i = ELEMENTS.indexOf(def);
     this.info.style.setProperty('--accent', def.color);
-    this.$('info-glyph').innerHTML = glyphSVG(def.id);
-    this.$('info-eyebrow').textContent = ORDINALS[i];
+    this.$('info-glyph').innerHTML = glyphSVG(def.glyph);
+    this.$('info-eyebrow').textContent = def.eyebrow;
     this.$('info-name').textContent = def.name;
-    this.$('info-greek').textContent = `${def.greek}  ·  ${def.latin}`;
+    this.$('info-sub').textContent = def.subtitle;
     this.$('info-motto').textContent = def.motto;
     this.$('info-text').textContent = def.text;
-    this.$('info-qualities').textContent = def.qualities.join(' & ');
-    this.$('info-solid').textContent = def.solid;
+    def.facts.forEach(([label, value], i) => {
+      this.$(`info-fact${i}-label`).textContent = label;
+      this.$(`info-fact${i}`).textContent = value;
+    });
+    const open = this.$('info-open');
+    open.hidden = !def.url;
+    if (def.url) {
+      const external = this.#isExternal(def.url);
+      open.href = def.url;
+      open.target = external ? '_blank' : '';
+      open.rel = external ? 'noopener' : '';
+      this.$('info-open-label').textContent = `Open ${def.name}`;
+      this.$('info-open-key').textContent = external ? '↗' : '↵';
+    }
     // restart the entrance transition when hopping between elements
     this.info.classList.remove('is-open');
     void this.info.offsetWidth;
     this.info.classList.add('is-open');
     this.info.setAttribute('aria-hidden', 'false');
+  }
+
+  #isExternal(url) {
+    return new URL(url, location.href).origin !== location.origin;
+  }
+
+  /** Follow the focused destination's link (Enter). */
+  #open() {
+    const def = ELEMENTS.find((d) => d.id === this.app.focused);
+    if (!def?.url) return;
+    if (this.#isExternal(def.url)) window.open(def.url, '_blank', 'noopener');
+    else location.href = def.url;
   }
 
   #step(dir) {

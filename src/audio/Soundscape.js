@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 /**
- * Fully procedural ambience (no audio files): crackling fire, gusting wind,
- * babbling water and a deep earthen rumble, over a soft drone. Each element
- * has its own bus whose gain and stereo pan follow the camera.
+ * Fully procedural ambience (no audio files) over a soft drone: rustling paper
+ * at Resume, and for now the original wind, water and earth voices at the
+ * stations that still run those elements. Each station has its own bus whose
+ * gain and stereo pan follow the camera.
  */
 export class Soundscape {
   constructor(app) {
@@ -116,7 +117,7 @@ export class Soundscape {
 
     this.bus = {};
     this.pan = {};
-    for (const id of ['fire', 'air', 'water', 'earth']) {
+    for (const id of ['resume', 'experience', 'projects', 'profile']) {
       const g = this.#gain(0);
       const p = ctx.createStereoPanner();
       g.connect(p).connect(this.master);
@@ -124,29 +125,28 @@ export class Soundscape {
       this.pan[id] = p;
     }
 
-    // ---- fire: breathing roar + scheduled crackles ----
-    const roarGain = this.#gain(0.5);
-    this.#loop(brown).connect(this.#filter('lowpass', 420)).connect(roarGain).connect(this.bus.fire);
-    this.#lfo(0.23, 0.18, roarGain.gain);
-    this.#lfo(1.7, 0.08, roarGain.gain);
-    this.crackle = this.#gain(0.55);
-    this.crackle.connect(this.bus.fire);
+    // ---- resume: quiet room air + scheduled paper rustles ----
+    const airGain = this.#gain(0.12);
+    this.#loop(pink).connect(this.#filter('bandpass', 1600, 0.6)).connect(airGain).connect(this.bus.resume);
+    this.#lfo(0.11, 0.05, airGain.gain);
+    this.rustle = this.#gain(0.5);
+    this.rustle.connect(this.bus.resume);
 
     // ---- air: two sweeping band-passed winds + a faint whistle ----
     const windA = this.#filter('bandpass', 520, 0.9);
     const windAGain = this.#gain(0.55);
-    this.#loop(pink).connect(windA).connect(windAGain).connect(this.bus.air);
+    this.#loop(pink).connect(windA).connect(windAGain).connect(this.bus.experience);
     this.#lfo(0.07, 260, windA.frequency);
     this.#lfo(0.11, 0.3, windAGain.gain);
     const windB = this.#filter('bandpass', 1300, 2.5);
     const windBGain = this.#gain(0.2);
-    this.#loop(pink).connect(windB).connect(windBGain).connect(this.bus.air);
+    this.#loop(pink).connect(windB).connect(windBGain).connect(this.bus.experience);
     this.#lfo(0.05, 500, windB.frequency);
     this.#lfo(0.17, 0.15, windBGain.gain);
     const whistle = ctx.createOscillator();
     whistle.frequency.value = 880;
     const whistleGain = this.#gain(0.0);
-    whistle.connect(whistleGain).connect(this.bus.air);
+    whistle.connect(whistleGain).connect(this.bus.experience);
     whistle.start();
     this.#lfo(0.09, 40, whistle.frequency);
     this.#lfo(0.13, 0.012, whistleGain.gain);
@@ -154,18 +154,18 @@ export class Soundscape {
     // ---- water: babbling band-pass + scheduled droplet "bloops" ----
     this.babble = this.#filter('bandpass', 700, 3.5);
     const babbleGain = this.#gain(0.32);
-    this.#loop(pink).connect(this.babble).connect(babbleGain).connect(this.bus.water);
+    this.#loop(pink).connect(this.babble).connect(babbleGain).connect(this.bus.projects);
     this.drops = this.#gain(0.5);
-    this.drops.connect(this.bus.water);
+    this.drops.connect(this.bus.projects);
 
     // ---- earth: deep rumble + occasional stone knocks ----
     const rumbleGain = this.#gain(0.9);
-    this.#loop(brown).connect(this.#filter('lowpass', 95, 0.9)).connect(rumbleGain).connect(this.bus.earth);
+    this.#loop(brown).connect(this.#filter('lowpass', 95, 0.9)).connect(rumbleGain).connect(this.bus.profile);
     this.#lfo(0.06, 0.35, rumbleGain.gain);
     this.knocks = this.#gain(0.5);
-    this.knocks.connect(this.bus.earth);
+    this.knocks.connect(this.bus.profile);
 
-    // ---- sanctum drone ----
+    // ---- hub drone ----
     const drone = this.#gain(0.035);
     const droneLP = this.#filter('lowpass', 520, 0.5);
     droneLP.connect(drone).connect(this.master);
@@ -198,20 +198,23 @@ export class Soundscape {
     if (!this.enabled) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.05;
-    // fire crackles & pops
-    if (Math.random() < 0.55) {
-      const n = 1 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < n; i++) {
-        this.#burst(this.crackle, t0 + Math.random() * 0.06, {
-          freq: 1800 + Math.random() * 4200,
-          amp: 0.08 + Math.random() * 0.35,
-          decay: 0.01 + Math.random() * 0.035,
-          dur: 0.05,
+    // paper: soft rustles, now and then a longer page turn
+    if (Math.random() < 0.09) {
+      this.#burst(this.rustle, t0, {
+        freq: 1400 + Math.random() * 2600,
+        type: 'bandpass',
+        Q: 0.8,
+        amp: 0.04 + Math.random() * 0.08,
+        decay: 0.05 + Math.random() * 0.1,
+        dur: 0.16,
+      });
+    }
+    if (Math.random() < 0.012) {
+      for (let i = 0; i < 4; i++) {
+        this.#burst(this.rustle, t0 + i * 0.045 + Math.random() * 0.02, {
+          freq: 900 + Math.random() * 1800, type: 'bandpass', Q: 0.7, amp: 0.1, decay: 0.12, dur: 0.18,
         });
       }
-    }
-    if (Math.random() < 0.035) {
-      this.#burst(this.crackle, t0, { freq: 700 + Math.random() * 500, type: 'bandpass', Q: 1.2, amp: 0.7, decay: 0.09 });
     }
     // water babble wanders
     this.babble.frequency.setTargetAtTime(350 + Math.random() * 900, t0, 0.04);
@@ -239,7 +242,7 @@ export class Soundscape {
     if (!this.enabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     this._right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-    const base = { fire: 1.0, air: 0.75, water: 0.85, earth: 0.8 };
+    const base = { resume: 0.9, experience: 0.75, projects: 0.85, profile: 0.8 };
     for (const el of elements) {
       const id = el.def.id;
       el.group.getWorldPosition(this._v);

@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// Linear-HDR stage: heat haze above the fire + subtle lens chromatic aberration + HDR clamp.
+// Linear-HDR stage: heat haze above a source station (none at present) + subtle lens chromatic aberration + HDR clamp.
 const HazeShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -125,7 +125,7 @@ export class PostFX {
     this.finish.uniforms.uResolution.value.set(w * dpr, h * dpr);
   }
 
-  /** Project the fire column to screen space to drive the heat-haze distortion. */
+  /** Project a station's hot column to screen space to drive the heat-haze distortion. */
   setHazeSource(base, top, strength) {
     const a = this._a.copy(base).project(this.camera);
     const b = this._b.copy(top).project(this.camera);

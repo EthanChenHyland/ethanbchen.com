@@ -41,6 +41,6 @@ if (!hasWebGL2()) {
     })
     .catch((err) => {
       console.error(err);
-      fail('Something went wrong while summoning the elements. See the console for details.');
+      fail('Something went wrong while loading the hub. See the console for details.');
     });
 }

@@ -5,12 +5,15 @@ import { Noise3, mulberry32 } from '../gl/noise.js';
 import { ELEMENTS, PLATFORM_RADIUS, stationPosition } from '../config.js';
 import { makeRockGeometry } from './rocks.js';
 
+const GLYPHS = ['fire', 'air', 'water', 'earth'];
+
 const FLOOR_GLSL = /* glsl */ `
 uniform float uTime;
 uniform sampler2D uNoise2D;
 uniform vec3 uStPos[4];
 uniform vec3 uStCol[4];
 uniform float uStGlow[4];
+uniform int uStGlyph[4];
 varying vec3 vWPos;
 ${hashGLSL}
 ${causticGLSL}
@@ -30,7 +33,7 @@ float udTri(vec2 p, float r) {
   p.x -= clamp(p.x, -2.0 * r, 0.0);
   return length(p);
 }
-// kind: 0 fire, 1 air, 2 water, 3 earth — the alchemical triangles
+// kind: 0 fire, 1 air, 2 water, 3 earth — the alchemical triangles (placeholder station glyphs)
 float glyphDist(vec2 q, int kind, float s) {
   if (kind >= 2) q.y = -q.y;
   float d = udTri(q, s);
@@ -149,7 +152,7 @@ void floorSurface(vec2 p) {
       vec2 dir = normalize(uStPos[i].xz);
       vec2 lp = p - dir * 1.36;
       vec2 q = vec2(dot(lp, vec2(dir.y, -dir.x)), dot(lp, dir));
-      float gm = lineMask(glyphDist(q, i, 0.2), 0.02);
+      float gm = lineMask(glyphDist(q, uStGlyph[i], 0.2), 0.02);
       medEmit += uStCol[i] * gm * (2.2 + 2.0 * uStGlow[i]);
       medAlb = mix(medAlb, medAlb * 0.3, gm);
     }
@@ -203,7 +206,7 @@ void floorSurface(vec2 p) {
     vec2 gc = st + dir * 2.95;
     vec2 lp = p - gc;
     vec2 q = vec2(dot(lp, side), -dot(lp, dir)); // upright when seen from outside the ring
-    float gdist = glyphDist(q, i, 0.44);
+    float gdist = glyphDist(q, uStGlyph[i], 0.44);
     chan += uStCol[i] * lineMask(gdist, 0.03) * 1.8 * glow;
     groove = max(groove, lineMask(gdist, 0.055));
   }
@@ -211,41 +214,6 @@ void floorSurface(vec2 p) {
   rough = mix(rough, 0.3, groove);
   height -= groove * 0.004;
   emit += chan;
-
-  // ---------- elemental weathering ----------
-  // Fire (0): scorched stone with smouldering cracks
-  float dF = length(p - uStPos[0].xz);
-  float scorch = 1.0 - smoothstep(1.5, 3.4, dF + (nB.r - 0.5) * 1.8);
-  albedo *= mix(1.0, 0.3, scorch);
-  rough = mix(rough, 0.95, scorch * 0.5);
-  float ember = smoothstep(0.78, 0.96, nC.a) * scorch * smoothstep(1.55, 1.8, dF);
-  emit += vec3(1.0, 0.22, 0.03) * ember * (0.8 + 0.6 * sin(uTime * 2.3 + nB.g * 12.0));
-
-  // Water (2): wet stone, puddles, dancing caustics
-  float dW = length(p - uStPos[2].xz);
-  float wet = 1.0 - smoothstep(1.6, 3.8, dW + (nA.g - 0.5) * 2.0);
-  albedo *= mix(1.0, 0.45, wet);
-  rough = mix(rough, 0.12, wet);
-  float puddle = smoothstep(0.52, 0.6, nB.g) * wet;
-  rough = mix(rough, 0.07, puddle);
-  height = mix(height, height * 0.1, max(puddle, wet * 0.6));
-  emit += uStCol[2] * causticPattern(p * 0.32, uTime * 0.55) * 0.05 * (1.0 - smoothstep(1.7, 3.3, dW)) * smoothstep(1.55, 1.8, dW);
-
-  // Earth (3): moss creeping through the joints
-  float dE = length(p - uStPos[3].xz);
-  float moss = 1.0 - smoothstep(1.7, 4.4, dE + (nA.b - 0.5) * 2.6);
-  float mossMask = moss * mix(1.0, 0.5, tile) * smoothstep(0.35, 0.62, nB.r + moss * 0.35);
-  vec3 mossCol = mix(vec3(0.022, 0.05, 0.012), vec3(0.07, 0.12, 0.025), nC.g);
-  albedo = mix(albedo, mossCol, mossMask);
-  rough = mix(rough, 0.92, mossMask);
-  height += mossMask * 0.002 * nC.r;
-
-  // Air (1): wind-swept dust spiral
-  float dA = length(p - uStPos[1].xz);
-  vec2 ap = p - uStPos[1].xz;
-  float sw = atan(ap.x, ap.y) + dA * 1.6 - uTime * 0.05;
-  float swirl = smoothstep(0.55, 1.0, sin(sw * 3.0 + nB.r * 2.5)) * (1.0 - smoothstep(1.8, 3.6, dA)) * smoothstep(1.6, 2.0, dA);
-  albedo = mix(albedo, albedo * 1.7 + 0.012, swirl * 0.55);
 
   gAlbedo = albedo;
   gRough = clamp(rough, 0.07, 1.0);
@@ -268,6 +236,7 @@ export function createFloorMaterial(ctx) {
     uStPos: { value: stPos },
     uStCol: { value: stCol },
     uStGlow: ctx.uniforms.uStGlow,
+    uStGlyph: { value: ELEMENTS.map((d) => GLYPHS.indexOf(d.glyph)) },
   };
   patchMaterial(mat, {
     key: 'floor',

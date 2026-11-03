@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ELEMENTS } from '../config.js';
 
 /** Moonlight, sky fill and a procedural HDR environment for reflections. */
 export class Lighting {
@@ -68,10 +69,13 @@ export class Lighting {
     // cool softboxes
     addLight('#9fb6ff', 2.2, new THREE.Vector3(30, 20, 10), [26, 10], 'plane');
     addLight('#b7c9ff', 1.4, new THREE.Vector3(-26, 14, 26), [20, 6], 'plane');
-    // elemental glows on the horizon
-    addLight('#ff7a2f', 3.0, new THREE.Vector3(-30, 4, 30), 5);
-    addLight('#2aa9ff', 2.2, new THREE.Vector3(30, 5, -30), 6);
-    addLight('#6fd66a', 1.2, new THREE.Vector3(-30, 6, -30), 5);
+    // station-coloured glows on the horizon, behind each station
+    for (const d of ELEMENTS) {
+      const g = d.envGlow;
+      if (!g) continue;
+      const r = 42.43;
+      addLight(d.color, g.intensity, new THREE.Vector3(Math.sin(d.azimuth) * r, g.y, Math.cos(d.azimuth) * r), g.size);
+    }
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const rt = pmrem.fromScene(env, 0.03);

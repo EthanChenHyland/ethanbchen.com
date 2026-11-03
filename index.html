@@ -4,38 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#05070d" />
-    <meta name="description" content="Fire, Air, Water and Earth — the four classical elements rendered in real time with Three.js." />
-    <title>Elementa — The Four Elements</title>
+    <meta name="description" content="Ethan B. Chen — software engineer, creative technologist and builder of interactive systems." />
+    <title>Ethan B. Chen</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
-    <canvas id="scene" aria-label="Real-time 3D scene of the four classical elements"></canvas>
+    <canvas id="scene" aria-label="Real-time 3D hub with four destinations: Resume, Profile, Projects and Experience"></canvas>
 
     <div class="ui" id="ui">
       <header class="brand">
-        <h1>Elementa</h1>
-        <p>The four classical elements</p>
+        <h1>Ethan B. Chen</h1>
+        <p>Software engineer · Creative tech · Interactive systems</p>
       </header>
 
       <aside class="info" id="info" aria-live="polite" aria-hidden="true">
         <div class="info__glyph" id="info-glyph"></div>
         <p class="info__eyebrow" id="info-eyebrow"></p>
         <h2 class="info__name" id="info-name"></h2>
-        <p class="info__greek" id="info-greek"></p>
+        <p class="info__sub" id="info-sub"></p>
         <p class="info__motto" id="info-motto"></p>
         <p class="info__text" id="info-text"></p>
         <dl class="info__facts">
-          <div><dt>Qualities</dt><dd id="info-qualities"></dd></div>
-          <div><dt>Platonic solid</dt><dd id="info-solid"></dd></div>
+          <div><dt id="info-fact0-label"></dt><dd id="info-fact0"></dd></div>
+          <div><dt id="info-fact1-label"></dt><dd id="info-fact1"></dd></div>
         </dl>
+        <a class="chip chip--wide info__open" id="info-open" hidden><span id="info-open-label"></span> <kbd id="info-open-key"></kbd></a>
         <div class="info__nav">
-          <button class="chip" data-step="-1" aria-label="Previous element">‹</button>
-          <button class="chip chip--wide" data-focus="all">Back to the sanctum <kbd>Esc</kbd></button>
-          <button class="chip" data-step="1" aria-label="Next element">›</button>
+          <button class="chip" data-step="-1" aria-label="Previous destination">‹</button>
+          <button class="chip chip--wide" data-focus="all">Back to overview <kbd>Esc</kbd></button>
+          <button class="chip" data-step="1" aria-label="Next destination">›</button>
         </div>
       </aside>
 
-      <nav class="dock" id="dock" aria-label="Choose an element"></nav>
+      <nav class="dock" id="dock" aria-label="Choose a destination"></nav>
 
       <div class="toolbar" role="toolbar" aria-label="View options">
         <button class="icon-btn" id="btn-sound" aria-pressed="false" title="Ambient sound (S)">
@@ -52,15 +53,15 @@
         </button>
       </div>
 
-      <p class="hint" id="hint">Drag to orbit · Scroll to zoom<br />Click an element or press <kbd>1</kbd>–<kbd>4</kbd></p>
+      <p class="hint" id="hint">Drag to orbit · Scroll to zoom<br />Click a destination or press <kbd>1</kbd>–<kbd>4</kbd></p>
     </div>
 
     <div class="tooltip" id="tooltip" role="status"></div>
 
     <div class="loader" id="loader" aria-live="polite">
       <div class="loader__ring" id="loader-glyphs"></div>
-      <p class="loader__title">Elementa</p>
-      <p class="loader__status" id="loader-status">Summoning the elements…</p>
+      <p class="loader__title">Ethan B. Chen</p>
+      <p class="loader__status" id="loader-status">Loading…</p>
       <div class="loader__bar"><span id="loader-bar"></span></div>
     </div>
 

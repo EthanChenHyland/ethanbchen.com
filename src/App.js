@@ -7,18 +7,19 @@ import { Platform } from './world/Platform.js';
 import { Motes } from './world/Motes.js';
 import { PostFX } from './fx/PostFX.js';
 import { CameraRig } from './core/CameraRig.js';
-import { Fire } from './elements/Fire.js';
+import { Resume } from './elements/Resume.js';
 import { Water } from './elements/Water.js';
 import { Air } from './elements/Air.js';
 import { Earth } from './elements/Earth.js';
 
-const ELEMENT_CLASSES = { fire: Fire, water: Water, air: Air, earth: Earth };
+// Resume replaces Fire; the other destinations still run the original elements.
+const ELEMENT_CLASSES = { resume: Resume, experience: Air, projects: Water, profile: Earth };
 const UP = new THREE.Vector3(0, 1, 0);
 
 const QUALITY = {
-  low: { dpr: 1.0, fireSteps: 30, shadowSize: 1024, embers: 260, grass: 1800, leaves: 1200, ribbons: 60 },
-  medium: { dpr: 1.5, fireSteps: 40, shadowSize: 2048, embers: 420, grass: 2800, leaves: 1900, ribbons: 80 },
-  high: { dpr: 2.0, fireSteps: 52, shadowSize: 2048, embers: 560, grass: 3800, leaves: 2600, ribbons: 110 },
+  low: { dpr: 1.0, volumeSteps: 24, shadowSize: 1024, fibers: 160, grass: 1800, leaves: 1200, ribbons: 60 },
+  medium: { dpr: 1.5, volumeSteps: 32, shadowSize: 2048, fibers: 260, grass: 2800, leaves: 1900, ribbons: 80 },
+  high: { dpr: 2.0, volumeSteps: 40, shadowSize: 2048, fibers: 340, grass: 3800, leaves: 2600, ribbons: 110 },
 };
 
 export const OVERVIEW = {
@@ -113,7 +114,7 @@ export class App {
     };
     this.ctx = { renderer, scene, camera, noise3D, noise2D, uniforms: this.uniforms, quality: this.quality, app: this };
 
-    await this.#progress('Raising the sanctum', 0.4);
+    await this.#progress('Laying the platform', 0.4);
     const bare = this.params.has('bare'); // debug: element only, no world
     this.sky = new Sky(this.ctx);
     if (!bare) scene.add(this.sky.group);
@@ -129,10 +130,13 @@ export class App {
     let p = 0.5;
     for (const def of ELEMENTS) {
       if (only && only !== def.id) continue;
-      await this.#progress(`Summoning ${def.name.toLowerCase()}`, p);
+      await this.#progress(`Building ${def.name.toLowerCase()}`, p);
       p += 0.1;
       const el = new ELEMENT_CLASSES[def.id](this.ctx, def);
       el.def = def;
+      // eased 0..1 hover and focus amounts, for stations that respond to them
+      el.hoverK = 0;
+      el.focusK = 0;
       scene.add(el.group);
       this.elements.push(el);
     }
@@ -151,6 +155,7 @@ export class App {
       this.rig.jumpTo(v.pos, v.target);
       this.rig.setLimits('focus');
       this.focused = focus;
+      this.elements.find((e) => e.def.id === focus).focusK = 1;
     } else if (this.params.has('cam')) {
       const c = this.params.get('cam').split(',').map(Number);
       const t = (this.params.get('tgt') ?? '0,1.5,0').split(',').map(Number);
@@ -267,15 +272,20 @@ export class App {
     for (const el of this.elements) {
       const u = el.pedestal?.material.userData.uniforms;
       if (u) u.uGlow.value = glow[ELEMENTS.indexOf(el.def)];
+      const id = el.def.id;
+      el.hoverK += ((id === this.hovered && id !== this.focused ? 1 : 0) - el.hoverK) * Math.min(1, dt * 3);
+      // slower than the glow so a station's focus change plays out across the camera flight
+      el.focusK += ((id === this.focused ? 1 : 0) - el.focusK) * Math.min(1, dt * 1.4);
     }
 
-    let fire = null;
+    // heat haze only follows a station that provides a source; the pass itself always runs
+    let hazy = null;
     for (const el of this.elements) {
       el.update(this.time, dt, this.camera);
-      if (el.def.id === 'fire') fire = el;
+      if (el.hazeBase) hazy = el;
     }
-    if (fire) this.post.setHazeSource(fire.hazeBase, fire.hazeTop, 1.0);
-    else this.post.setHazeSource(new THREE.Vector3(), new THREE.Vector3(), 0);
+    if (hazy) this.post.setHazeSource(hazy.hazeBase, hazy.hazeTop, 1.0);
+    else this.post.setHazeSource(this._zero ??= new THREE.Vector3(), this._zero, 0);
 
     this.sound?.update(this.camera, this.elements, this.focused);
     this.post.render(this.time, dt);
