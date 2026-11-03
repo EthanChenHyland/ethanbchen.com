@@ -250,6 +250,13 @@ export class App {
     if (!this.frozen) this.time += dt;
     this.uniforms.uTime.value = this.time;
 
+    // a pixel-ratio change from #adapt is applied here, before this frame renders:
+    // resizing the canvas after drawing clears the frame the browser is about to show
+    if (this.pendingResize) {
+      this.pendingResize = false;
+      this.#resize();
+    }
+
     this.idle += dt;
     const c = this.rig.controls;
     if (this.autoOrbit && this.idle > 7 && !this.rig.busy && !c.autoRotate) c.autoRotate = true;
@@ -317,7 +324,7 @@ export class App {
       a.n = 0;
       if (avg > 1 / 48 && this.dpr > 1.0) {
         this.dpr = Math.max(1.0, this.dpr - 0.25);
-        this.#resize();
+        this.pendingResize = true;
         a.cooldown = 2;
         console.info(`[elements] frame time ${(avg * 1000).toFixed(1)}ms → pixel ratio ${this.dpr}`);
       }
