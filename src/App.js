@@ -27,6 +27,22 @@ export const OVERVIEW = {
   target: new THREE.Vector3(0, 2.3, 0),
 };
 
+// Idle overview recomposition. The intro settles at OVERVIEW (about 17° above horizontal, 17.56
+// from its target). A camera left higher than 38° up drifts down to 30°, the highest view at which
+// the upright Resume page still reads as a standing document; a distance more than about ±16%
+// off the overview's drifts back to it. Both move at about the orbit's own pace (it turns ~2°/s).
+// Views inside those limits are left as placed, apart from a barely perceptible breathing.
+const RECOMPOSE = {
+  trigger: THREE.MathUtils.degToRad(38),
+  elevation: THREE.MathUtils.degToRad(30),
+  radius: OVERVIEW.pos.distanceTo(OVERVIEW.target),
+  deadZone: 0.15,
+  elevRate: THREE.MathUtils.degToRad(2), // per second, at most
+  radiusRate: 0.045, // log-distance per second, at most
+  breathElev: THREE.MathUtils.degToRad(1.5),
+  breathRadius: 0.018, // ±1.8% of the distance
+};
+
 export class App {
   constructor(canvas, { onProgress } = {}) {
     this.canvas = canvas;
@@ -220,6 +236,8 @@ export class App {
     if (id === 'all') id = null;
     const same = id === this.focused; // re-selecting the current view resets the framing
     if (id) {
+      // re-selecting the focused station reframes it; let the station respond to the attention too
+      if (same) this.elements.find((e) => e.def.id === id)?.onReframe?.();
       const v = this.focusView(id);
       this.rig.setLimits('focus');
       this.rig.flyTo(v.pos, v.target, { duration: same ? 1.4 : 2.4, arc: same ? 0.3 : this.focused ? 2.2 : 1.2 });
@@ -262,6 +280,10 @@ export class App {
     if (this.autoOrbit && this.idle > 7 && !this.rig.busy && !c.autoRotate) c.autoRotate = true;
     if (!this.autoOrbit) c.autoRotate = false;
     c.autoRotateSpeed = this.focused ? 0.5 : 0.28;
+    // a camera left looking almost straight down spirals back to a readable height, but only while
+    // the idle overview orbit runs (any input stops auto-rotate, and with it this)
+    if (c.autoRotate && !this.focused && !this.rig.busy && !this.introActive) this.rig.recompose(dt, RECOMPOSE);
+    else this.rig.endRecompose();
     this.fade = Math.max(0, this.fade - dt * 0.55);
     this.post.finish.uniforms.uFade.value = this.fade * this.fade;
 

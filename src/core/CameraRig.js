@@ -74,6 +74,61 @@ export class CameraRig {
     this.controls.update();
   }
 
+  /**
+   * Idle recomposition around the current target, in spherical terms only: azimuth and target
+   * are never touched, so the orbit keeps its own constant speed.
+   *  - A view higher than `trigger` drifts down to `elevation`, and a distance well outside a dead
+   *    zone around `radius` drifts back to it. Each correction latches when it starts and runs to
+   *    its goal; both are rate-limited (about the orbit's own pace) and slow near the goal.
+   *  - Once nothing is correcting, a very slow breathing in elevation and distance fades in around
+   *    wherever the camera sits (two unrelated slow periods each, so it never reads as a loop).
+   */
+  recompose(dt, { trigger, elevation, radius, deadZone, elevRate, radiusRate, breathElev, breathRadius }) {
+    const r = (this._recomp ??= { elev: false, dist: false, ve: 0, vr: 0, w: 0, t: this._breathT ?? 0, be: 0, br: 0 });
+    const c = this.controls;
+    this._off ??= new THREE.Vector3();
+    this._sph ??= new THREE.Spherical();
+    this._sph.setFromVector3(this._off.subVectors(this.camera.position, c.target));
+    const sp = this._sph;
+    const elevNow = Math.PI / 2 - sp.phi;
+    if (elevNow > trigger) r.elev = true;
+    if (Math.abs(Math.log(sp.radius / radius)) > deadZone) r.dist = true;
+
+    // recovery: speed eases in and out; it is proportional to the error near the goal and capped
+    const ease = 1 - Math.exp(-dt / 1.5);
+    const errE = r.elev ? elevNow - elevation : 0;
+    r.ve += (Math.sign(errE) * Math.min(elevRate, Math.abs(errE) * 0.35) - r.ve) * ease;
+    sp.phi += r.ve * dt;
+    if (r.elev && Math.abs(errE) < 0.003) r.elev = false;
+    const errR = r.dist ? Math.log(radius / sp.radius) : 0;
+    r.vr += (Math.sign(errR) * Math.min(radiusRate, Math.abs(errR) * 0.3) - r.vr) * ease;
+    sp.radius *= Math.exp(r.vr * dt);
+    if (r.dist && Math.abs(errR) < 0.003) r.dist = false;
+
+    // breathing: in only while settled; applied as the change in its offset, so it never jumps
+    const settled = !r.elev && !r.dist && Math.abs(r.ve) < 0.002 && Math.abs(r.vr) < 0.002;
+    r.w += ((settled ? 1 : 0) - r.w) * (1 - Math.exp(-dt / 4));
+    r.t += dt;
+    this._breathT = r.t;
+    const tau = Math.PI * 2;
+    const be = r.w * breathElev * (0.65 * Math.sin((tau * r.t) / 27) + 0.35 * Math.sin((tau * r.t) / 41 + 1.3));
+    const br = r.w * breathRadius * (0.6 * Math.sin((tau * r.t) / 33 + 2.0) + 0.4 * Math.sin((tau * r.t) / 52 + 0.4));
+    // breathing never lifts the view toward the overhead trigger
+    const headroom = trigger - 0.01 - (Math.PI / 2 - sp.phi);
+    sp.phi -= Math.min(be - r.be, Math.max(headroom, 0));
+    sp.radius *= Math.exp(br - r.br);
+    r.be = be;
+    r.br = br;
+
+    sp.makeSafe();
+    this.camera.position.copy(c.target).add(this._off.setFromSpherical(sp));
+  }
+
+  /** Stop any idle recomposition where it is (the user is back in control, or the view changed). */
+  endRecompose() {
+    this._recomp = null;
+  }
+
   update(dt) {
     const tw = this.tween;
     if (tw) {
