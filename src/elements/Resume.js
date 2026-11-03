@@ -53,6 +53,8 @@ const LINES = LINE_Y.length;
 const lineY = (i) => LINE_Y[i];
 const smooth = (t) => t * t * (3 - 2 * t);
 const sstep = (a, b, x) => smooth(THREE.MathUtils.clamp((x - a) / (b - a), 0, 1));
+// 0 below `from`, rising early (exponent < 1) to 1 at `to`, with a soft start over the first 2°
+const driftCurve = (d, from, to, k) => sstep(from, from + 2, d) * Math.pow(THREE.MathUtils.clamp((d - from) / (to - from), 0, 1), k);
 
 const PAPER_GLSL = /* glsl */ `
 uniform float uGlow;
@@ -158,6 +160,7 @@ export class Resume {
     this.life = 0;
     this.pulse = 0;
     this.pulseHold = 0;
+    this.pulseAmp = 1;
     this.drift = 0;
     this.focusDir = null;
     this._att = new THREE.Vector3();
@@ -753,22 +756,27 @@ export class Resume {
       drift = THREE.MathUtils.radToDeg(this.focusDir.angleTo(off));
     } else if (!focused) this.focusDir = null;
     this.drift = drift;
-    this.life += (sstep(12, 45, drift) - this.life) * Math.min(1, dt * 0.4);
-    // one retriggerable envelope: a quick rise, a short hold, a soft decay
+    // nothing for the first few degrees, a first trace by about 7°, clearly alive by 10–15°, the
+    // full (unchanged) focused-idle activity by about 35°; eased just enough to stay smooth
+    this.life += (driftCurve(drift, 5, 35, 0.7) - this.life) * Math.min(1, dt * 1.5);
+    // one retriggerable envelope: a quick rise to its strength, a short hold, a soft decay
     if (this.pulseHold > 0) {
       this.pulseHold -= dt;
-      this.pulse += (1 - this.pulse) * Math.min(1, dt * 7);
+      this.pulse += (this.pulseAmp - this.pulse) * Math.min(1, dt * 7);
     } else this.pulse *= Math.exp(-dt / 0.9);
     if (!focused) this.pulse = Math.min(this.pulse, 1) * Math.exp(-dt * 3);
   }
 
   /**
-   * The focused page was selected again, and the camera is reframing it. If the view had wandered
-   * well away first, the paper wakes for a moment alongside the reframe and settles as the
-   * composition returns. A pulse still under way is not stacked.
+   * The focused page was selected again, and the camera is reframing it. The paper wakes alongside
+   * the reframe in proportion to how far the view had wandered: nothing within about 4°, restrained
+   * by 7–10° (a couple of seconds into the focus orbit), the full pulse by about 30°. It settles as
+   * the composition returns, and a pulse still under way is not stacked.
    */
   onReframe() {
-    if (this.drift < 25 || this.life < 0.45 || this.pulse >= 0.35) return;
+    const amp = driftCurve(this.drift, 4, 30, 0.6);
+    if (amp < 0.02 || this.pulse >= 0.35 * amp) return;
+    this.pulseAmp = amp;
     this.pulseHold = 0.35;
   }
 

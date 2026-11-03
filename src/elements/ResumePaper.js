@@ -412,6 +412,18 @@ export class PaperEcosystem {
     // continuous, a gentle bump rather than a jump
     items.forEach((a, i) => {
       let moved = false;
+      // the slips, stylus and docked note too (not for the aeroplane: its own path keeps it clear,
+      // and a hard push near the dock would kink its landing)
+      if (!a.plane) {
+        for (const o of obstacles) {
+          d.subVectors(c(a, ca), o.p);
+          const dist = d.length(), min = a.r + o.r + GAP;
+          if (dist < min && dist > 1e-4) {
+            a.p.addScaledVector(d, (min - dist) / dist);
+            moved = true;
+          }
+        }
+      }
       for (let j = 0; j < i; j++) {
         d.subVectors(c(a, ca), c(items[j], cb));
         const dist = d.length(), min = (items[j].plane ? a.rFull ?? a.r : a.r) + items[j].r + GAP;
