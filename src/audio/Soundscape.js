@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ResumeSound } from './ResumeSound.js';
 
 /**
- * Fully procedural ambience (no audio files) over a soft drone: the self-writing
+ * Fully procedural ambience (no audio files): the self-writing
  * document at Resume (see ResumeSound), and for now the original wind, water and
  * earth voices at the stations that still run those elements. Each station has its
  * own bus whose gain and stereo pan follow the camera.
@@ -162,19 +162,8 @@ export class Soundscape {
     this.knocks = this.#gain(0.5);
     this.knocks.connect(this.bus.profile);
 
-    // ---- hub drone ----
-    const drone = this.#gain(0.035);
-    const droneLP = this.#filter('lowpass', 520, 0.5);
-    droneLP.connect(drone).connect(this.master);
-    for (const [f, type] of [[55, 'sine'], [82.41, 'sine'], [110.3, 'triangle'], [164.8, 'sine']]) {
-      const o = ctx.createOscillator();
-      o.type = type;
-      o.frequency.value = f;
-      o.detune.value = (Math.random() - 0.5) * 8;
-      o.connect(droneLP);
-      o.start();
-    }
-    this.#lfo(0.03, 220, droneLP.frequency);
+    // The original Opus hub drone (four oscillators at 55, 82.4, 110.3 and 164.8 Hz) is not built:
+    // it read as a constant hum. The hub's ambience will be designed once all four stations exist.
   }
 
   #burst(out, when, { freq, type = 'highpass', Q = 0.7, amp, decay, dur = 0.12 }) {
