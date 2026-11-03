@@ -1,11 +1,13 @@
 import { ELEMENTS } from '../config.js';
+import { GLYPH_STROKES, glyphPath } from './glyphs.js';
 
-/** Inline SVG of a station's placeholder symbol (a glyph name from config, or the "all" sigil). */
+/** Inline SVG of a station's symbol (a glyph name from config, or the "all" sigil). */
 export function glyphSVG(id) {
   const attrs = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"';
   if (id === 'all') {
     return `<svg ${attrs}><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4 20.6 12 12 20.6 3.4 12Z"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>`;
   }
+  if (GLYPH_STROKES[id]) return `<svg ${attrs}><path d="${glyphPath(id)}"/></svg>`;
   const up = id === 'fire' || id === 'air';
   const tri = up ? 'M12 3.2 21.4 19.5H2.6Z' : 'M12 20.8 21.4 4.5H2.6Z';
   const bar = id === 'air' ? '<path d="M3.6 12.6h16.8"/>' : id === 'earth' ? '<path d="M3.6 11.4h16.8"/>' : '';

@@ -4,85 +4,106 @@ import { worldPosVaryingVertex } from '../gl/glsl.js';
 import { mulberry32, noise1 } from '../gl/noise.js';
 import { createPedestal } from '../world/Platform.js';
 import { stationPosition } from '../config.js';
+import { PaperEcosystem, paperMaterial, STOCK } from './ResumePaper.js';
 
-const FOLIO_Y = 3.2; // centre of the sheet above the floor
-const COLS = 6;
-const ROWS = 10;
-// Miura-ori unit: parallelogram with sides A (along a row) and B (across rows) at sector angle GAMMA.
-const GAMMA = THREE.MathUtils.degToRad(65);
-const B = 0.45;
-const A = 1.1 * B;
-const BC = B * Math.cos(GAMMA);
-const BS = B * Math.sin(GAMMA);
-const FLAT_W = COLS * A + BC;
-const FLAT_H = ROWS * BS;
-const VOL_HALF = new THREE.Vector3(2.5, 2.7, 2.5);
-const STYLUS_SCALE = 1.5; // the probe has to read from across the platform
+const FOLIO_Y = 3.75; // centre of the sheet above the floor
+// The sheet: one large page in a shallow letter (Z) fold, with two soft creases at a
+// third and two thirds of its height and a broad curl across its width.
+const FLAT_W = 3.8;
+const FLAT_H = 4.9;
+const NX = 40;
+const NY = 60;
+const CREASE = [1 / 3, 2 / 3];
+const VOL_HALF = new THREE.Vector3(2.9, 3.3, 2.9);
+const STYLUS_SCALE = 1.7; // the probe has to read from across the platform
 
-// Printed layout in flat page coordinates (0..1): 28 body rows (a heading, five
-// lines and a gap per section) plus three header lines. Each line is written,
-// and later fades, on its own.
-const BODY_TOP = 0.805;
-const ROW_H = 0.0255;
-const LINES = 31; // 0..27 body, 28 name, 29 contact, 30 rule
+// Page layout in flat page coordinates (u right, v up, 0..1). The title, section headings
+// and rules are permanent print; the body lines under each heading are written by the
+// stylus and fade on their own. [length as a share of the text width, bold]
+// Ordered like the real résumé; Experience carries the most weight, Skills closes with a
+// denser, shorter block. `row` overrides the line spacing.
+const SECTIONS = [
+  { title: 'EDUCATION', lines: [[0.6, 1], [0.74, 0]] },
+  { title: 'EXPERIENCE', lines: [[0.56, 1], [0.88, 0], [0.76, 0], [0.5, 1], [0.84, 0], [0.66, 0], [0.48, 1], [0.8, 0]] },
+  { title: 'PROJECTS', lines: [[0.44, 1], [0.84, 0], [0.7, 0], [0.4, 1], [0.78, 0]] },
+  { title: 'SKILLS', row: 0.021, lines: [[0.92, 0], [0.86, 0], [0.7, 0]] },
+];
 const X0 = 0.1;
-
-/**
- * Rigid Miura fold of the sheet for fold amount f (0 flat → 1 fully collapsed).
- * Every row is the same zigzag in x–z; consecutive rows are shifted by ±q in x
- * and r in y, which keeps each parallelogram face rigid and planar.
- */
-function miura(f) {
-  const p = A * (1 - f * (1 - Math.cos(GAMMA)));
-  const h = Math.sqrt(Math.max(A * A - p * p, 0));
-  const q = (A * B * Math.cos(GAMMA)) / p;
-  const r = Math.sqrt(Math.max(B * B - q * q, 0));
-  return { p, h, q, r };
+const TEXT_W = 0.8;
+const ROW_H = 0.026;
+const TITLE = { v0: 0.905, v1: 0.952, rule: 0.887 };
+const HEADS = [];
+const LINE_Y = [], LINE_W = [], LINE_BOLD = [], LINE_SEC = [];
+{
+  let v = 0.85;
+  SECTIONS.forEach((sec, si) => {
+    HEADS.push({ title: sec.title, v });
+    v -= 0.044;
+    for (const [w, bold] of sec.lines) {
+      LINE_Y.push(v);
+      LINE_W.push(w);
+      LINE_BOLD.push(bold);
+      LINE_SEC.push(si);
+      v -= sec.row ?? ROW_H;
+    }
+    v -= 0.028;
+  });
 }
-
-const lineY = (i) => (i < 28 ? BODY_TOP - (i + 0.5) * ROW_H : [0.9015, 0.862, 0.8375][i - 28]);
+const LINES = LINE_Y.length;
+const lineY = (i) => LINE_Y[i];
 const smooth = (t) => t * t * (3 - 2 * t);
+const sstep = (a, b, x) => smooth(THREE.MathUtils.clamp((x - a) / (b - a), 0, 1));
 
 const PAPER_GLSL = /* glsl */ `
 uniform float uGlow;
 uniform float uInkGain;
+uniform float uCrease;
+uniform sampler2D uTitle;
+uniform vec4 uMark[4]; // x0, y, x end so far, ink
 uniform vec3 uLightW;
 uniform vec3 uLightCol;
 uniform sampler2D uNoise2D;
 uniform float uLineEnd[${LINES}];
 uniform float uLineInk[${LINES}];
 uniform float uLineW[${LINES}];
+uniform float uLineY[${LINES}];
+uniform float uLineBold[${LINES}];
 varying vec2 vPage;
-varying vec2 vFace;
 varying vec3 vWPos;
-float bar(vec2 uv, float y0, float y1, float x1) {
-  vec2 aa = fwidth(uv) * 1.2;
-  float v = smoothstep(y0 - aa.y, y0 + aa.y, uv.y) * (1.0 - smoothstep(y1 - aa.y, y1 + aa.y, uv.y));
-  float u = smoothstep(${X0.toFixed(2)} - aa.x, ${X0.toFixed(2)} + aa.x, uv.x) * (1.0 - smoothstep(x1 - aa.x, x1 + aa.x, uv.x));
-  return v * u;
-}
-// how much of line i is showing at x: written up to its end, then receding unevenly as its ink fades
-float shown(int i, vec2 uv) {
-  float aa = fwidth(uv.x) * 1.5;
-  float written = 1.0 - smoothstep(uLineEnd[i] - aa, uLineEnd[i] + aa, uv.x);
-  float n = texture(uNoise2D, uv * vec2(5.0, 9.0) + float(i) * 0.137).r;
-  return written * smoothstep(n * 0.45, n * 0.45 + 0.3, uLineInk[i]);
-}
-float lineX1(int i) { return ${X0.toFixed(2)} + uLineW[i] * 0.8; }
-// branch-free so derivatives stay valid
+// body lines: each written up to its end; as its ink fades it recedes from that end, softly
 float inkMask(vec2 uv) {
-  float m = bar(uv, 0.885, 0.918, lineX1(28)) * shown(28, uv);
-  m = max(m, bar(uv, 0.858, 0.866, lineX1(29)) * 0.8 * shown(29, uv));
-  m = max(m, bar(uv, 0.836, 0.839, lineX1(30)) * 0.7 * shown(30, uv));
-  float row = floor((${BODY_TOP} - uv.y) / ${ROW_H});
-  float inBody = step(0.0, row) * step(row, 27.5);
-  int ri = int(clamp(row, 0.0, 27.0));
-  float head = step(mod(row, 7.0), 0.5);
-  float th = mix(0.17, 0.27, head);
-  float y0 = ${BODY_TOP} - (row + 0.5 + th) * ${ROW_H};
-  float y1 = ${BODY_TOP} - (row + 0.5 - th) * ${ROW_H};
-  m = max(m, bar(uv, y0, y1, lineX1(ri)) * inBody * mix(0.85, 1.0, head) * shown(ri, uv));
+  vec2 aa = fwidth(uv) * 1.2;
+  float n0 = texture(uNoise2D, uv * vec2(5.0, 9.0)).r;
+  float left = smoothstep(${X0.toFixed(2)} - aa.x, ${X0.toFixed(2)} + aa.x, uv.x);
+  float m = 0.0;
+  for (int i = 0; i < ${LINES}; i++) {
+    float th = mix(0.16, 0.3, uLineBold[i]) * ${ROW_H};
+    float v = 1.0 - smoothstep(th - aa.y, th + aa.y, abs(uv.y - uLineY[i]));
+    float x1 = ${X0.toFixed(2)} + uLineW[i] * ${TEXT_W};
+    float u = left * (1.0 - smoothstep(x1 - aa.x, x1 + aa.x, uv.x));
+    float n = fract(n0 + float(i) * 0.618);
+    float lead = ${X0.toFixed(2)} + (uLineEnd[i] - ${X0.toFixed(2)}) * clamp(uLineInk[i] * 1.25, 0.0, 1.0) + (n - 0.5) * 0.012;
+    float written = 1.0 - smoothstep(lead - 0.012 - aa.x, lead + aa.x, uv.x);
+    float ink = step(0.001, uLineInk[i]) * mix(0.6, 1.0, uLineInk[i]);
+    m = max(m, v * u * written * ink * mix(0.82, 1.0, uLineBold[i]));
+  }
   return m;
+}
+// underlines the stylus adds while the page is being read
+float markMask(vec2 uv) {
+  vec2 maa = fwidth(uv) * 1.2;
+  float m = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec4 mk = uMark[k];
+    float mv = 1.0 - smoothstep(0.0026 - maa.y, 0.0026 + maa.y, abs(uv.y - mk.y));
+    float mu = smoothstep(mk.x - maa.x, mk.x + maa.x, uv.x) * (1.0 - smoothstep(mk.z - maa.x, mk.z + maa.x, uv.x));
+    m = max(m, mv * mu * mk.w);
+  }
+  return m;
+}
+// the permanent print: title, section headings and rules
+float titleMask(vec2 uv) {
+  return texture(uTitle, uv).a;
 }
 `;
 
@@ -103,22 +124,32 @@ export class Resume {
     this.folio.position.y = FOLIO_Y;
     this.group.add(this.folio);
 
-    this._grid = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
-    this.zMid = 0;
+    // per-frame shape of the sheet, shared by the mesh and the stylus
+    this.prof = { y: new Float32Array(NY + 1), z: new Float32Array(NY + 1) };
+    this.sh = { curl: 0.7, flex: 1, time: 0, pu: 0.5, pv: 0.5, press: 0, yMid: 0, zMid: 0 };
     this.#initLines();
+    this.marks = [0, 1, 2, 3].map(() => new THREE.Vector4(0, -1, 0, 0));
+    this.markSlot = 0;
     this.#buildSheet(ctx);
     this.#buildStylus();
     this.#buildVolume(ctx);
     this.#buildFibers(ctx);
+    this.#buildSlips();
+    this.paper = new PaperEcosystem(this);
+    this.tipGroup = new THREE.Vector3(0, FOLIO_Y, 0);
+    this.stylusMid = new THREE.Vector3(0, FOLIO_Y, 0);
+    this.stylusEnd = new THREE.Vector3(0, FOLIO_Y, 0);
+    this._cam = new THREE.Vector3();
 
     // support light behind the sheet keeps it sculptural and pools on the floor;
     // the stylus tip carries the moving key light
     this.fill = new THREE.PointLight(0xffc58c, 14, 22, 2);
-    this.fill.position.set(0, -0.1, -1.6);
+    // far enough back (and low) that the back of the page is lit, not burnt
+    this.fill.position.set(0, -0.9, -2.9);
     this.folio.add(this.fill);
 
-    this.hit = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 6.4, 16), new THREE.MeshBasicMaterial());
-    this.hit.position.y = 3.2;
+    this.hit = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 7.4, 16), new THREE.MeshBasicMaterial());
+    this.hit.position.y = 3.7;
     this.hit.visible = false;
     this.hit.userData.elementId = def.id;
     this.group.add(this.hit);
@@ -135,12 +166,7 @@ export class Resume {
 
   #initLines() {
     const rand = mulberry32(31);
-    this.lineW = new Float32Array(LINES);
-    for (let r = 0; r < 28; r++) {
-      const k = r % 7;
-      this.lineW[r] = k === 6 ? 0 : k === 0 ? 0.3 + 0.12 * rand() : 0.5 + 0.42 * rand();
-    }
-    this.lineW.set([0.58, 0.8, 1.0], 28);
+    this.lineW = new Float32Array(LINE_W);
     this.lineEnd = new Float32Array(LINES);
     this.lineInk = new Float32Array(LINES);
     this.lineFade = new Float32Array(LINES);
@@ -148,56 +174,53 @@ export class Resume {
     for (let i = 0; i < LINES; i++) {
       this.lineFade[i] = 0.012 + 0.028 * rand();
       if (this.lineW[i] > 0 && rand() < 0.55) {
-        this.lineEnd[i] = X0 + this.lineW[i] * 0.8;
+        this.lineEnd[i] = X0 + this.lineW[i] * TEXT_W;
         this.lineInk[i] = 0.25 + 0.7 * rand();
       }
     }
   }
 
   #lineX1(i) {
-    return X0 + this.lineW[i] * 0.8;
+    return X0 + this.lineW[i] * TEXT_W;
   }
 
   #buildSheet(ctx) {
-    const faces = COLS * ROWS;
     const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(faces * 6 * 3);
-    const page = new Float32Array(faces * 6 * 2);
-    const corner = new Float32Array(faces * 6 * 2);
-    // two triangles per parallelogram, A B D / A D C, with flat-pattern page coordinates
-    const quad = [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]];
-    let v = 0;
-    for (let j = 0; j < ROWS; j++) {
-      for (let i = 0; i < COLS; i++) {
-        for (const [di, dj] of quad) {
-          const gi = i + di, gj = j + dj;
-          page.set([(gi * A + (gj % 2) * BC) / FLAT_W, (gj * BS) / FLAT_H], v * 2);
-          corner.set([di, dj], v * 2);
-          v++;
-        }
+    const page = new Float32Array((NX + 1) * (NY + 1) * 2);
+    for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) page.set([i / NX, j / NY], (j * (NX + 1) + i) * 2);
+    const index = [];
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const a = j * (NX + 1) + i, b = a + NX + 1;
+        index.push(a, a + 1, b + 1, a, b + 1, b);
       }
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
-    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(pos.length), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setIndex(index);
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((NX + 1) * (NY + 1) * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array((NX + 1) * (NY + 1) * 3), 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('aPage', new THREE.BufferAttribute(page, 2));
-    geo.setAttribute('aFace', new THREE.BufferAttribute(corner, 2));
 
     this.paperU = {
       uGlow: { value: 1 },
       uInkGain: { value: 0.8 },
+      uCrease: { value: 1 },
+      uTitle: { value: this.#printTexture() },
+      uMark: { value: this.marks },
       uLightW: { value: new THREE.Vector3() },
       uLightCol: { value: new THREE.Color(0xffc58c) },
       uNoise2D: { value: ctx.noise2D },
       uLineEnd: { value: this.lineEnd },
       uLineInk: { value: this.lineInk },
       uLineW: { value: this.lineW },
+      uLineY: { value: LINE_Y },
+      uLineBold: { value: LINE_BOLD },
     };
     const mat = new THREE.MeshStandardMaterial({ color: '#e4d9c6', roughness: 0.86, metalness: 0, side: THREE.DoubleSide });
     patchMaterial(mat, {
       key: 'resume-paper',
       uniforms: this.paperU,
-      vertexHeader: 'attribute vec2 aPage; attribute vec2 aFace; varying vec2 vPage; varying vec2 vFace; varying vec3 vWPos;',
-      vertex: { begin_vertex: `#include <begin_vertex>\nvPage = aPage; vFace = aFace;\n${worldPosVaryingVertex}` },
+      vertexHeader: 'attribute vec2 aPage; varying vec2 vPage; varying vec3 vWPos;',
+      vertex: { begin_vertex: `#include <begin_vertex>\nvPage = aPage;\n${worldPosVaryingVertex}` },
       fragmentHeader: PAPER_GLSL,
       fragment: {
         color_fragment: /* glsl */ `
@@ -206,9 +229,14 @@ export class Resume {
             vec4 fib = texture(uNoise2D, vPage * vec2(3.1, 4.0));
             vec4 fib2 = texture(uNoise2D, vPage * vec2(17.0, 22.0) + 0.3);
             diffuseColor.rgb *= 0.9 + 0.08 * fib.r + 0.06 * fib2.g;
-            float edge = min(min(vFace.x, 1.0 - vFace.x), min(vFace.y, 1.0 - vFace.y));
-            diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(0.0, 0.06, edge));   // pressed creases
-            if (gl_FrontFacing) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.028, 0.027), inkMask(vPage) * uInkGain);
+            // two pressed creases, fading as the page flattens
+            float cr = exp(-pow((vPage.y - ${CREASE[0].toFixed(4)}) / 0.006, 2.0)) + exp(-pow((vPage.y - ${CREASE[1].toFixed(4)}) / 0.006, 2.0));
+            diffuseColor.rgb *= 1.0 - 0.14 * cr * uCrease;
+            if (gl_FrontFacing) {
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.028, 0.027), inkMask(vPage) * uInkGain);
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025, 0.024, 0.023), titleMask(vPage) * 0.94);
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.19, 0.07), markMask(vPage) * 0.9);
+            }
             else diffuseColor.rgb *= vec3(0.97, 0.94, 0.88);
           }`,
         emissivemap_fragment: /* glsl */ `
@@ -228,6 +256,131 @@ export class Resume {
     this.sheet.receiveShadow = true;
     this.sheet.frustumCulled = false;
     this.folio.add(this.sheet);
+  }
+
+  /** The page's permanent print, drawn once into a page-sized texture: a centred title, section headings, rules. */
+  #printTexture() {
+    const W = 1536, H = Math.round((1536 * FLAT_H) / FLAT_W);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 8;
+    const font = (px, weight = 600) => `${weight} ${px}px "Inter Variable", Inter, system-ui, sans-serif`;
+    // tracked capitals; x is the left edge, or the centre when centred
+    const tracked = (g, text, x, baseline, px, track, centred, weight) => {
+      g.font = font(px, weight);
+      const widths = [...text].map((ch) => g.measureText(ch).width);
+      const total = widths.reduce((a, b) => a + b, 0) + track * px * (text.length - 1);
+      let cx = centred ? x - total / 2 : x;
+      [...text].forEach((ch, k) => {
+        g.fillText(ch, cx, baseline);
+        cx += widths[k] + track * px;
+      });
+    };
+    const y = (v) => (1 - v) * H;
+    const draw = () => {
+      const g = canvas.getContext('2d');
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = '#000';
+      g.textBaseline = 'alphabetic';
+      const titlePx = ((TITLE.v1 - TITLE.v0) * H) / 0.727; // Inter's cap height
+      tracked(g, 'RESUME', W / 2, y(TITLE.v0), titlePx, 0.32, true);
+      g.fillRect(X0 * W, y(TITLE.rule), TEXT_W * W, 2.5);
+      // section headings: bold, about half the title's cap height, well above the body bars
+      const headPx = (0.021 * H) / 0.727;
+      for (const h of HEADS) {
+        tracked(g, h.title, X0 * W, y(h.v), headPx, 0.18, false, 700);
+        g.fillRect(X0 * W, y(h.v - 0.011), TEXT_W * W, 1.5);
+      }
+      tex.needsUpdate = true;
+    };
+    draw();
+    Promise.all([document.fonts?.load(font(64)), document.fonts?.load(font(64, 700))]).then(draw, () => {});
+    return tex;
+  }
+
+  /**
+   * A few loose pieces of the same document: index tabs on the right edge, an annotation
+   * slip on the left, a small card at the foot. Each one, on its own slow cycle, peels off
+   * its margin, drifts beside or behind the sheet, and settles back.
+   */
+  #buildSlips() {
+    const tab = { w: 0.6, h: 0.26, band: 0.36, lines: 1 };
+    this.slips = [
+      { ...tab, u: 1, v: 0.76, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#b98b4e', period: 19, phase: 0.1, drift: [2.35, 1.06, 0.1] },
+      { ...tab, u: 1, v: 0.5, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#3a3836', period: 26, phase: 0.55, drift: [2.6, 0.3, -0.2] },
+      { ...tab, u: 1, v: 0.27, ox: 1, oy: 0, z: -0.012, rot: 0, color: '#e6dccb', bandColor: '#9a4a35', period: 33, phase: 0.8, drift: [2.3, -0.47, 0.15] },
+      { w: 0.82, h: 0.54, band: 0, lines: 3, u: 0, v: 0.6, ox: -1, oy: 0, z: 0.016, rot: -0.1, color: STOCK.warm, bandColor: '#000000', period: 23, phase: 0.35, drift: [-2.45, 0.45, 0.0] },
+      { w: 0.74, h: 0.44, band: 0.12, lines: 2, u: 0, v: 0.2, ox: -1, oy: 0, z: -0.012, rot: 0.05, color: '#d4d2cb', bandColor: '#3a3836', period: 41, phase: 0.2, drift: [-2.25, -1.45, 0.1] },
+    ];
+    const overlap = 0.1; // how far each piece tucks under or over the page
+    this.slips.forEach((d, i) => {
+      const geo = new THREE.PlaneGeometry(d.w, d.h, 10, 2);
+      const pa = geo.attributes.position;
+      for (let k = 0; k < pa.count; k++) pa.setZ(k, 0.05 * (pa.getX(k) / d.w) ** 2); // a slight natural bow
+      geo.computeVertexNormals();
+      const mat = paperMaterial(d.color, { lines: d.lines, band: d.band, bandColor: d.bandColor, seed: i * 7.31 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.folio.add(mesh);
+      d.mesh = mesh;
+      d.shift = new THREE.Vector2(d.ox * (d.w / 2 - overlap), d.oy * (d.h / 2 - overlap));
+      d.drift = new THREE.Vector3(...d.drift).multiplyScalar(1.18);
+      // tabs sit with their coloured end outward
+      d.flip = d.ox < 0 ? Math.PI : 0;
+    });
+    this._T = new THREE.Vector3();
+    this._Bv = new THREE.Vector3();
+    this._m4 = new THREE.Matrix4();
+    this._qa = new THREE.Quaternion();
+    this._qb = new THREE.Quaternion();
+    this._qc = new THREE.Quaternion();
+    this._e = new THREE.Euler();
+  }
+
+  #stepSlips(time, dt, hk, fk) {
+    const P = this._p, N = this._n, T = this._T, Bv = this._Bv;
+    this.slips.forEach((d, i) => {
+      // its own slow cycle: on the margin, peel away, drift, return
+      const ph = (time / d.period + d.phase) % 1;
+      let a = sstep(0.12, 0.3, ph) - sstep(0.62, 0.82, ph);
+      a *= 1 - 0.55 * hk;
+      // while the page is being read, the annotation slip alone lifts now and then
+      const read = i === 3 ? 0.18 * (sstep(0, 0.15, (time / 13) % 1) - sstep(0.35, 0.5, (time / 13) % 1)) : 0;
+      a = THREE.MathUtils.lerp(a, read, fk);
+      d.a = a;
+
+      // attached pose: on the page surface at its margin, in the page's own frame
+      const e = 0.01;
+      this.#point(d.u + e, d.v, T);
+      this.#point(d.u - e, d.v, P);
+      T.sub(P).normalize();
+      this.#point(d.u, Math.min(d.v + e, 1), Bv);
+      this.#point(d.u, Math.max(d.v - e, 0), P);
+      Bv.sub(P).normalize();
+      N.crossVectors(T, Bv).normalize();
+      Bv.crossVectors(N, T);
+      this.#point(d.u, d.v, P);
+      const attached = this._v.copy(P).addScaledVector(T, d.shift.x).addScaledVector(Bv, d.shift.y).addScaledVector(N, d.z);
+      this._m4.makeBasis(T, Bv, N);
+      this._qa.setFromRotationMatrix(this._m4).multiply(this._qc.setFromAxisAngle(this._d.set(0, 0, 1), d.rot + d.flip));
+
+      // drift pose: beside or behind the sheet, tumbling slowly
+      const s = i * 1.7;
+      const drift = this._d.copy(d.drift).add(this._p.set(0.25 * Math.sin(time * 0.37 + s), 0.3 * Math.sin(time * 0.29 + s * 2), 0.25 * Math.sin(time * 0.41 + s * 3)));
+      this._qb.copy(this._qa).multiply(this._qc.setFromEuler(this._e.set(0.5 * Math.sin(time * 0.4 + s), 0.6 * Math.sin(time * 0.23 + s) + 0.4, 0.3 * Math.sin(time * 0.31 + s))));
+
+      // the angle leads the position, so it peels before it travels
+      const pk = smooth(a);
+      d.mesh.position.copy(attached).lerp(drift, pk);
+      d.mesh.quaternion.slerpQuaternions(this._qa, this._qb, Math.sqrt(a));
+      // a little lift of the free edge, and a flutter when the stylus passes close
+      const near = Math.exp(-d.mesh.position.distanceToSquared(this.tipPos) * 3);
+      const lift = Math.sin(Math.min(a * 2.5, 1) * Math.PI) * 0.45 + near * 0.12 * Math.sin(time * 13 + i);
+      d.mesh.quaternion.multiply(this._qc.setFromAxisAngle(this._p.set(0, 1, 0), lift * (d.ox || 1)));
+    });
   }
 
   // ---------------------------------------------------------------- stylus
@@ -270,8 +423,8 @@ export class Resume {
     this.stylus.castShadow = true;
     this.folio.add(this.stylus);
 
-    this.tipMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.78, 0.5).multiplyScalar(8), toneMapped: true });
-    this.tip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8), this.tipMat);
+    this.tipMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.78, 0.5).multiplyScalar(3), toneMapped: true });
+    this.tip = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), this.tipMat);
     this.stylus.add(this.tip);
 
     // the moving key light rides just off the tip, on the writing side
@@ -292,24 +445,51 @@ export class Resume {
     this.trip = null;
   }
 
-  /** Point and front normal on the folded sheet at page coordinates (u, v), in folio space. */
-  #surface(u, v, outP, outN) {
-    const g = this._grid;
-    const jf = THREE.MathUtils.clamp((v * FLAT_H) / BS, 0, ROWS - 1e-4);
-    const j = Math.floor(jf), t = jf - j;
-    const xoff = THREE.MathUtils.lerp((j % 2) * BC, ((j + 1) % 2) * BC, t);
-    const fi = THREE.MathUtils.clamp((u * FLAT_W - xoff) / A, 0, COLS - 1e-4);
-    const i = Math.floor(fi), s = fi - i;
-    const k = (jj, ii) => (jj * (COLS + 1) + ii) * 3;
-    const a = k(j, i), b = k(j, i + 1), c = k(j + 1, i), d = k(j + 1, i + 1);
-    for (let e = 0; e < 3; e++) {
-      const bottom = g[a + e] + (g[b + e] - g[a + e]) * s;
-      const top = g[c + e] + (g[d + e] - g[c + e]) * s;
-      outP.setComponent(e, bottom + (top - bottom) * t - (e === 2 ? this.zMid : 0));
+  /** Point on the sheet at page coordinates (u, v), in folio space. */
+  #point(u, v, out) {
+    const sh = this.sh, { y, z } = this.prof;
+    const jf = THREE.MathUtils.clamp(v, 0, 1) * NY;
+    const j = Math.min(Math.floor(jf), NY - 1), t = jf - j;
+    const x0 = (u - 0.5) * FLAT_W;
+    let px = x0, pz = 0;
+    if (sh.curl > 1e-3) {
+      // broad curl across the width, edges toward the viewer
+      const R = FLAT_W / sh.curl;
+      px = R * Math.sin(x0 / R);
+      pz = R * (1 - Math.cos(x0 / R));
     }
-    const ux = g[b] - g[a], uy = g[b + 1] - g[a + 1], uz = g[b + 2] - g[a + 2];
-    const wx = g[c] - g[a], wy = g[c + 1] - g[a + 1], wz = g[c + 2] - g[a + 2];
-    outN.set(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx).normalize();
+    const tm = sh.time;
+    // slow flex, a little edge movement, and a soft give under the stylus
+    pz += sh.flex * (0.07 * Math.sin(tm * 0.6) * Math.sin(Math.PI * u) * (v - 0.5) + 0.03 * Math.sin(tm * 0.43 + u * 2.0) * Math.sin(Math.PI * v));
+    pz += sh.flex * 0.025 * Math.sin(tm * 1.7 + v * 6.0) * (sstep(0.85, 1, u) - sstep(0.15, 0, u) * 0.7);
+    const du = (u - sh.pu) * FLAT_W, dv = (v - sh.pv) * FLAT_H;
+    pz -= sh.press * 0.035 * Math.exp(-(du * du + dv * dv) / 0.12);
+    return out.set(px, y[j] + (y[j + 1] - y[j]) * t - sh.yMid, pz + z[j] + (z[j + 1] - z[j]) * t - sh.zMid);
+  }
+
+  /** Point, page-right and page-up tangents, and front normal at (u, v), in folio space. */
+  pageFrame(u, v, outP, outT, outB, outN) {
+    const e = 0.01;
+    this.#point(u + e, v, outT);
+    this.#point(u - e, v, outP);
+    outT.sub(outP).normalize();
+    this.#point(u, Math.min(v + e, 1), outB);
+    this.#point(u, Math.max(v - e, 0), outP);
+    outB.sub(outP).normalize();
+    outN.crossVectors(outT, outB).normalize();
+    outB.crossVectors(outN, outT);
+    this.#point(u, v, outP);
+  }
+
+  /** Point and front normal at page coordinates (u, v): the stylus guide surface. */
+  #surface(u, v, outP, outN) {
+    const e = 0.01;
+    const a = this.#point(u + e, v, (this._sa ??= new THREE.Vector3()));
+    const b = this.#point(u - e, v, (this._sb ??= new THREE.Vector3()));
+    const c = this.#point(u, v + e, (this._sc ??= new THREE.Vector3()));
+    const d = this.#point(u, v - e, (this._sd ??= new THREE.Vector3()));
+    outN.crossVectors(a.sub(b), c.sub(d)).normalize();
+    this.#point(u, v, outP);
   }
 
   /** Choose a faded line to write next, away from the current one. */
@@ -340,12 +520,12 @@ export class Resume {
     const speed = 1 + 0.6 * hk;
     let pen = 0; // 1 while the tip is on the paper
 
-    const finishing = ['final', 'parked'].includes(this.mode) || (this.mode === 'fly' && ['final', 'parked'].includes(this.trip.next));
+    const finishing = ['final', 'parked', 'mark'].includes(this.mode) || (this.mode === 'fly' && ['final', 'parked', 'mark'].includes(this.trip.next));
     if (focused && !finishing) {
       this.#fly({ u: 0.12, v: 0.93 }, { duration: 0.75, wide: false, next: 'final' });
-    } else if (!focused && ['final', 'parked'].includes(this.mode)) {
+    } else if (!focused && ['final', 'parked', 'mark'].includes(this.mode)) {
       this.mode = 'idle';
-    } else if (!focused && this.mode === 'fly' && this.trip.next !== 'write') {
+    } else if (!focused && this.mode === 'fly' && ['final', 'parked', 'mark'].includes(this.trip.next)) {
       this.trip.next = 'write';
       this.trip.to = { line: this.#pickLine() };
     }
@@ -360,19 +540,25 @@ export class Resume {
       this.#fly({ line: i }, { duration: 2.2, next: 'write' });
     }
 
+    if (this.mode === 'write' && !focused && this.paper.plane.writable && this.paper.plane.cycle !== this.noteCycle && this.writeX > X0 + 0.08) {
+      this.noteCycle = this.paper.plane.cycle;
+      this.#fly({ note: true }, { duration: 1.5, next: 'note' });
+    }
+
     if (this.mode === 'write') {
       this.writeX = Math.min(this.writeX + dt * 0.16 * speed, this.#lineX1(this.line));
       this.lineEnd[this.line] = this.writeX;
       this.lineInk[this.line] = 1;
       this.#surface(this.writeX, lineY(this.line), P, N);
-      const jitter = 0.004 * Math.sin(time * 37.0) + 0.003 * Math.sin(time * 23.0);
-      this.tipPos.copy(P).addScaledVector(N, 0.012 + jitter);
+      this.tipPos.copy(P).addScaledVector(N, 0.012);
+      this.sh.pu = this.writeX;
+      this.sh.pv = lineY(this.line);
       this._lastN = N.clone();
       pen = 1;
       if (this.writeX >= this.#lineX1(this.line)) {
         // a short hop to the next line in the section, or lift off and travel elsewhere
         const below = this.line + 1;
-        if (this.line < 27 && this.lineW[below] > 0 && this.rand() < 0.55) {
+        if (below < LINES && LINE_SEC[below] === LINE_SEC[this.line] && this.rand() < 0.55) {
           this.#fly({ line: below }, { duration: 0.6, wide: false, next: 'write' });
         } else {
           this.#fly({ line: this.#pickLine() }, { duration: (2.0 + this.rand() * 0.9) / speed, next: 'write' });
@@ -380,12 +566,29 @@ export class Resume {
       }
     }
 
+    if (this.mode === 'note') {
+      // a short line on the docked note; it leaves for its flight with the writing on it
+      this.noteT = Math.min(1, this.noteT + dt / 1.8);
+      this.paper.noteFrame(this.noteT, P, N);
+      this.tipPos.copy(P).addScaledVector(N, 0.01);
+      this._lastN = N.clone();
+      this.paper.setNoteInk(this.noteT);
+      pen = 1;
+      this.paper.plane.hold = this.noteT < 1 && !focused;
+      if (this.noteT >= 1 || focused) {
+        this.paper.plane.hold = false;
+        this.#fly({ line: this.#pickLine() }, { duration: 2.2, next: 'write' });
+      }
+    }
+
     if (this.mode === 'final') {
-      // the closing pass: a fast zigzag down the page that resolves every line it passes
-      this.finalK = Math.min(1, (this.finalK ?? 0) + dt / 1.5);
-      const k = this.finalK;
+      // the closing pass: one smooth serpentine stroke down the page that resolves every line it passes
+      this.finalK = Math.min(1, (this.finalK ?? 0) + dt / 1.6);
+      const k = smooth(this.finalK);
       const v = 0.93 - k * 0.86;
-      const u = 0.14 + 0.74 * (0.5 - 0.5 * Math.cos(k * Math.PI * 9));
+      const u = 0.5 - 0.36 * Math.cos(k * Math.PI * 5);
+      this.sh.pu = u;
+      this.sh.pv = v;
       this.#surface(u, v, P, N);
       this.tipPos.copy(P).addScaledVector(N, 0.015);
       this._lastN = N.clone();
@@ -396,15 +599,46 @@ export class Resume {
           this.lineInk[i] = Math.min(1, this.lineInk[i] + dt * 3);
         }
       }
-      if (k >= 1) {
+      if (this.finalK >= 1) {
         this.finalK = 0;
         this.#fly({ park: true }, { duration: 0.9, wide: false, next: 'parked' });
       }
     }
 
     if (this.mode === 'parked') {
-      this.#surface(0.97, 0.99, P, N);
-      this.tipPos.copy(P).addScaledVector(N, 0.16).add(this._v.set(0.06, 0.12, 0));
+      this.#surface(0.99, 0.985, P, N);
+      this.tipPos.copy(P).addScaledVector(N, 0.05).add(this._v.set(0.05, 0.04, 0));
+      // the page is being read: now and then lift off and underline something, then park again
+      this.parkT = (this.parkT ?? 0) + dt;
+      if (focused && this.parkT > (this.parkWait ?? 4)) {
+        let i;
+        do i = Math.floor(this.rand() * LINES);
+        while (LINE_BOLD[i]);
+        const y = lineY(i) - ROW_H * 0.4;
+        const x0 = X0 + 0.01;
+        this.markSlot = (this.markSlot + 1) % 4;
+        this.marks[this.markSlot].set(x0, y, x0, 1);
+        this.markEnd = X0 + this.lineW[i] * TEXT_W * (0.35 + 0.5 * this.rand());
+        this.#fly({ u: x0, v: y }, { duration: 1.4, wide: false, next: 'mark' });
+      }
+    }
+
+    if (this.mode === 'mark') {
+      const mk = this.marks[this.markSlot];
+      this.writeX = Math.min(this.writeX + dt * 0.09, this.markEnd);
+      mk.z = this.writeX;
+      mk.w = 1;
+      this.#surface(this.writeX, mk.y, P, N);
+      this.tipPos.copy(P).addScaledVector(N, 0.012);
+      this._lastN = N.clone();
+      this.sh.pu = this.writeX;
+      this.sh.pv = mk.y;
+      pen = 1;
+      if (this.writeX >= this.markEnd) {
+        this.parkT = 0;
+        this.parkWait = 5 + this.rand() * 5;
+        this.#fly({ park: true }, { duration: 1.6, wide: false, next: 'parked' });
+      }
     }
 
     if (this.mode === 'fly') {
@@ -414,9 +648,12 @@ export class Resume {
       // the destination is evaluated live: the sheet keeps moving while the stylus travels
       const to = this._v;
       const toN = N;
-      if (tr.to.park) {
-        this.#surface(0.97, 0.99, to, toN);
-        to.addScaledVector(toN, 0.16).add(this._d.set(0.06, 0.12, 0));
+      if (tr.to.note) {
+        this.paper.noteFrame(0, to, toN);
+        to.addScaledVector(toN, 0.01);
+      } else if (tr.to.park) {
+        this.#surface(0.99, 0.985, to, toN);
+        to.addScaledVector(toN, 0.05).add(this._d.set(0.05, 0.04, 0));
       } else {
         const tu = tr.to.line !== undefined ? X0 : tr.to.u;
         const tv = tr.to.line !== undefined ? lineY(tr.to.line) : tr.to.v;
@@ -438,6 +675,9 @@ export class Resume {
         this.trip = null;
         if (tr.next === 'write') this.#startLine(tr.to.line);
         if (tr.next === 'final') this.finalK = 0;
+        if (tr.next === 'mark') this.writeX = tr.to.u;
+        if (tr.next === 'note') this.noteT = 0;
+        if (tr.next === 'parked') this.parkT = 0;
         this.mode = tr.next;
       }
     }
@@ -445,7 +685,7 @@ export class Resume {
     // body leans back from the paper and up; while travelling it trails its motion
     const n = this._lastN ?? N;
     const target = this._d.copy(n).multiplyScalar(0.55).add(this._v.set(0.22, 0.8, 0));
-    if (this.mode === 'parked') target.set(0.15, 1, 0.12);
+    if (this.mode === 'parked') target.set(1, 0.45, 0.25); // laid back along the page's right edge
     target.normalize();
     this.tipDir.lerp(target, Math.min(1, dt * 5)).normalize();
     this.stylus.position.copy(this.tipPos);
@@ -498,7 +738,7 @@ export class Resume {
           float n = texture(uNoise, p * 0.3 + vec3(0.0, -uTime * 0.025, uTime * 0.012)).r;
           float n2 = texture(uNoise, p * 0.85 + vec3(uTime * 0.018, -uTime * 0.04, 0.0)).g;
           float dust = smoothstep(0.4, 0.9, n * 0.7 + n2 * 0.45);
-          return exp(-dot(q, q) * 2.4) * (0.08 + dust) * 0.35 + exp(-dot(tq, tq) * 6.0) * (0.15 + dust) * 0.6;
+          return exp(-dot(q, q) * 2.4) * (0.08 + dust) * 0.35 + exp(-dot(tq, tq) * 12.0) * (0.15 + dust) * 0.2;
         }
         float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
         void main() {
@@ -617,63 +857,39 @@ export class Resume {
 
   // ---------------------------------------------------------------- fold
 
-  /** Fold the sheet, curl it around its vertical axis, and write flat-shaded faces. */
-  #shape(fold, curl) {
-    const { p, h, q, r } = miura(fold);
-    const g = this._grid;
-    const w = COLS * p + q;
-    const cx = w / 2, cy = (ROWS * r) / 2;
-    const R = curl > 1e-3 ? w / curl : 0;
-    let zSum = 0;
-    for (let j = 0; j <= ROWS; j++) {
-      for (let i = 0; i <= COLS; i++) {
-        let x = i * p + (j % 2) * q - cx;
-        let z = (i % 2) * h - h / 2;
-        if (R) {
-          const a = x / R;
-          z += R * (1 - Math.cos(a));
-          x = R * Math.sin(a);
-        }
-        const k = (j * (COLS + 1) + i) * 3;
-        g[k] = x;
-        g[k + 1] = j * r - cy;
-        g[k + 2] = z;
-        zSum += z;
-      }
+  /** Shape the sheet for this frame: a shallow Z fold down its height plus curl and flex. */
+  #deform(fold, curl, flex, time) {
+    const sh = this.sh;
+    sh.curl = curl;
+    sh.flex = flex;
+    sh.time = time;
+    // bend angle along the height: +fold, -fold, +fold across the three panels, eased over soft creases
+    const { y, z } = this.prof;
+    const ds = FLAT_H / NY;
+    let yy = 0, zz = 0, zSum = 0;
+    for (let j = 0; j <= NY; j++) {
+      const v = j / NY;
+      y[j] = yy;
+      z[j] = zz;
+      zSum += zz;
+      const sgn = 1 - 2 * sstep(CREASE[0] - 0.03, CREASE[0] + 0.03, v) + 2 * sstep(CREASE[1] - 0.03, CREASE[1] + 0.03, v);
+      yy += Math.cos(fold * sgn) * ds;
+      zz += Math.sin(fold * sgn) * ds;
     }
-    this.zMid = zSum / ((COLS + 1) * (ROWS + 1));
+    sh.yMid = y[NY] / 2;
+    const R = curl > 1e-3 ? FLAT_W / curl : 0;
+    sh.zMid = zSum / (NY + 1) + (R ? R - ((2 * R * R) / FLAT_W) * Math.sin(curl / 2) : 0);
+
     const pos = this.sheet.geometry.attributes.position;
-    const nrm = this.sheet.geometry.attributes.normal;
-    const P = pos.array, N = nrm.array;
-    const quad = [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]];
-    let v = 0;
-    for (let j = 0; j < ROWS; j++) {
-      for (let i = 0; i < COLS; i++) {
-        for (const [di, dj] of quad) {
-          const k = ((j + dj) * (COLS + 1) + i + di) * 3;
-          P[v * 3] = g[k];
-          P[v * 3 + 1] = g[k + 1];
-          P[v * 3 + 2] = g[k + 2] - this.zMid;
-          v++;
-        }
-        // one normal per triangle (the curl bends faces slightly out of plane)
-        for (let t = v - 6; t < v; t += 3) {
-          const ax = P[t * 3], ay = P[t * 3 + 1], az = P[t * 3 + 2];
-          const ux = P[t * 3 + 3] - ax, uy = P[t * 3 + 4] - ay, uz = P[t * 3 + 5] - az;
-          const wx = P[t * 3 + 6] - ax, wy = P[t * 3 + 7] - ay, wz = P[t * 3 + 8] - az;
-          let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
-          const l = Math.hypot(nx, ny, nz) || 1;
-          nx /= l; ny /= l; nz /= l;
-          for (let c = t * 3; c < (t + 3) * 3; c += 3) {
-            N[c] = nx;
-            N[c + 1] = ny;
-            N[c + 2] = nz;
-          }
-        }
+    const p = this._v;
+    for (let j = 0; j <= NY; j++) {
+      for (let i = 0; i <= NX; i++) {
+        this.#point(i / NX, j / NY, p);
+        pos.setXYZ(j * (NX + 1) + i, p.x, p.y, p.z);
       }
     }
     pos.needsUpdate = true;
-    nrm.needsUpdate = true;
+    this.sheet.geometry.computeVertexNormals();
   }
 
   update(time, dt, camera) {
@@ -681,9 +897,12 @@ export class Resume {
     const fk = smooth(THREE.MathUtils.clamp(this.focusK ?? 0, 0, 1));
     const focused = this.ctx.app.focused === this.def.id;
 
-    // about 60% open at rest, 75% on hover, flat when focused
-    const idleFold = 0.42 + 0.05 * Math.sin(time * 0.47) + 0.025 * Math.sin(time * 1.13 + 1.3) - 0.17 * hk;
-    this.#shape(THREE.MathUtils.lerp(idleFold, 0.002, fk), THREE.MathUtils.lerp(1.0, 0.0, fk));
+    // a shallow letter fold and broad curl at rest, a little flatter on hover, nearly flat when focused
+    const idleFold = 0.36 + 0.04 * Math.sin(time * 0.47) + 0.02 * Math.sin(time * 1.13 + 1.3) - 0.14 * hk;
+    const idleCurl = 0.75 + 0.08 * Math.sin(time * 0.31 + 0.7) - 0.2 * hk;
+    const pressTo = (['write', 'final', 'mark'].includes(this.mode) ? 1 : 0) * (1 - 0.5 * fk);
+    this.sh.press += (pressTo - this.sh.press) * Math.min(1, dt * 4);
+    this.#deform(THREE.MathUtils.lerp(idleFold, 0.012, fk), THREE.MathUtils.lerp(idleCurl, 0.18, fk), 1 - 0.8 * fk, time);
 
     // the printed side keeps turning toward the viewer with a slow sway; once focused it squares up
     this.group.worldToLocal(this._v.copy(camera.position));
@@ -704,26 +923,35 @@ export class Resume {
       if (!(this.mode === 'write' && i === this.line)) this.lineInk[i] = Math.max(0, this.lineInk[i] - this.lineFade[i] * dt * fade);
     }
 
+    this.group.worldToLocal(this._cam.copy(camera.position));
+    this.paper.update(time, dt, { hk, fk, tip: this.tipGroup, camera: this._cam, stylusMid: this.stylusMid, stylusEnd: this.stylusEnd, slips: this.slips });
     const pen = this.#stepStylus(dt, time, hk, focused);
+    this.#stepSlips(time, dt, hk, fk);
+    for (const mk of this.marks) if (!(this.mode === 'mark' && mk === this.marks[this.markSlot])) mk.w = Math.max(0, mk.w - dt * 0.025);
     const parked = this.mode === 'parked' ? 1 : 0;
     const flick = 0.92 + 0.08 * (noise1(time * 6.3, 2) - 0.5) * 2;
-    const tipGlow = parked ? 0.25 + 0.1 * Math.sin(time * 1.6) : (0.75 + 0.25 * pen) * (1 + 0.3 * hk) * flick;
-    this.tipMat.color.setRGB(1.0, 0.78, 0.5).multiplyScalar(2 + 5 * tipGlow);
+    const tipGlow = parked ? 0.25 + 0.1 * Math.sin(time * 1.6) : (0.75 + 0.25 * pen) * (1 + 0.15 * hk) * (1 - 0.35 * fk) * flick;
+    this.tipMat.color.setRGB(1.0, 0.8, 0.56).multiplyScalar(1.4 + 2.2 * tipGlow);
     this.stylusMat.userData.shader?.uniforms.uTipGlow && (this.stylusMat.userData.shader.uniforms.uTipGlow.value = tipGlow);
     // key light rides just off the tip, on the writing side of the paper
     const n = this._lastN ?? this._n;
-    this.light.position.copy(this.tipPos).addScaledVector(n, 0.5).addScaledVector(this.tipDir, 0.1);
-    this.light.intensity = 4.5 * tipGlow;
+    this.light.position.copy(this.tipPos).addScaledVector(n, 0.55).addScaledVector(this.tipDir, 0.1);
+    this.light.intensity = 1.6 * tipGlow;
 
     const breathe = 0.97 + 0.03 * (noise1(time * 0.9, 3) - 0.5) * 2;
-    this.fill.intensity = THREE.MathUtils.lerp(20, 24, fk) * breathe;
-    this.paperU.uGlow.value = THREE.MathUtils.lerp(1.4 + 0.5 * hk, 1.3, fk) * breathe;
+    this.fill.intensity = THREE.MathUtils.lerp(22, 26, fk) * breathe;
+    this.paperU.uGlow.value = THREE.MathUtils.lerp(2.6 + 0.8 * hk, 2.3, fk) * breathe;
     this.paperU.uInkGain.value = THREE.MathUtils.lerp(0.78 + 0.17 * hk, 1.0, fk);
+    this.paperU.uCrease.value = THREE.MathUtils.lerp(1, 0.25, fk);
     this.fill.getWorldPosition(this.paperU.uLightW.value);
 
     // fibres and dust gather around the tip
     const tipW = this.stylus.localToWorld(this._v.set(0, 0, 0));
     this.group.worldToLocal(tipW);
+    this.tipGroup.copy(tipW);
+    // the middle of the stylus body, for the loose paper to steer around
+    this.stylusMid.copy(this.tipPos).addScaledVector(this.tipDir, 0.6 * STYLUS_SCALE).applyMatrix4(this.folio.matrix);
+    this.stylusEnd.copy(this.tipPos).addScaledVector(this.tipDir, 1.15 * STYLUS_SCALE).applyMatrix4(this.folio.matrix);
     this.#stepFibers(dt, time, (pen ? 26 : 5) * (1 + 1.2 * hk) * (1 - 0.8 * parked), tipW);
     this.volMat.uniforms.uTip.value.copy(tipW).y -= FOLIO_Y;
     this.volMat.uniforms.uIntensity.value = (1.0 + 0.25 * hk) * (1 - 0.5 * fk) * breathe;

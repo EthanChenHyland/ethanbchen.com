@@ -4,8 +4,9 @@ import { hashGLSL, causticGLSL, bumpGLSL, worldPosVaryingVertex } from '../gl/gl
 import { Noise3, mulberry32 } from '../gl/noise.js';
 import { ELEMENTS, PLATFORM_RADIUS, stationPosition } from '../config.js';
 import { makeRockGeometry } from './rocks.js';
+import { glyphGLSL } from '../ui/glyphs.js';
 
-const GLYPHS = ['fire', 'air', 'water', 'earth'];
+const GLYPHS = ['fire', 'air', 'water', 'earth', 'resume'];
 
 const FLOOR_GLSL = /* glsl */ `
 uniform float uTime;
@@ -33,8 +34,11 @@ float udTri(vec2 p, float r) {
   p.x -= clamp(p.x, -2.0 * r, 0.0);
   return length(p);
 }
-// kind: 0 fire, 1 air, 2 water, 3 earth — the alchemical triangles (placeholder station glyphs)
+${glyphGLSL('resume', 'resumeGlyph')}
+// kind: 4 resume (stroke glyph); 0 fire, 1 air, 2 water, 3 earth — the alchemical triangles the
+// other stations still borrow
 float glyphDist(vec2 q, int kind, float s) {
+  if (kind == 4) return resumeGlyph(q, s);
   if (kind >= 2) q.y = -q.y;
   float d = udTri(q, s);
   if (kind == 1 || kind == 3) d = min(d, sdSeg(q, vec2(-0.95 * s, 0.16 * s), vec2(0.95 * s, 0.16 * s)));
@@ -152,6 +156,8 @@ void floorSurface(vec2 p) {
       vec2 dir = normalize(uStPos[i].xz);
       vec2 lp = p - dir * 1.36;
       vec2 q = vec2(dot(lp, vec2(dir.y, -dir.x)), dot(lp, dir));
+      // stroke glyphs read from outside the ring, like their station mark (the triangles are symmetric)
+      if (uStGlyph[i] == 4) q.y = -q.y;
       float gm = lineMask(glyphDist(q, uStGlyph[i], 0.2), 0.02);
       medEmit += uStCol[i] * gm * (2.2 + 2.0 * uStGlow[i]);
       medAlb = mix(medAlb, medAlb * 0.3, gm);

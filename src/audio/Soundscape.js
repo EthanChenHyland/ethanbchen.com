@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import { ResumeSound } from './ResumeSound.js';
 
 /**
- * Fully procedural ambience (no audio files) over a soft drone: rustling paper
- * at Resume, and for now the original wind, water and earth voices at the
- * stations that still run those elements. Each station has its own bus whose
- * gain and stereo pan follow the camera.
+ * Fully procedural ambience (no audio files) over a soft drone: the self-writing
+ * document at Resume (see ResumeSound), and for now the original wind, water and
+ * earth voices at the stations that still run those elements. Each station has its
+ * own bus whose gain and stereo pan follow the camera.
  */
 export class Soundscape {
   constructor(app) {
@@ -125,12 +126,8 @@ export class Soundscape {
       this.pan[id] = p;
     }
 
-    // ---- resume: quiet room air + scheduled paper rustles ----
-    const airGain = this.#gain(0.12);
-    this.#loop(pink).connect(this.#filter('bandpass', 1600, 0.6)).connect(airGain).connect(this.bus.resume);
-    this.#lfo(0.11, 0.05, airGain.gain);
-    this.rustle = this.#gain(0.5);
-    this.rustle.connect(this.bus.resume);
+    // ---- resume: stylus on paper and the paper around it ----
+    this.resume = new ResumeSound(ctx, this.bus.resume, { white: this.white, pink, brown }, this.master);
 
     // ---- air: two sweeping band-passed winds + a faint whistle ----
     const windA = this.#filter('bandpass', 520, 0.9);
@@ -198,24 +195,7 @@ export class Soundscape {
     if (!this.enabled) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.05;
-    // paper: soft rustles, now and then a longer page turn
-    if (Math.random() < 0.09) {
-      this.#burst(this.rustle, t0, {
-        freq: 1400 + Math.random() * 2600,
-        type: 'bandpass',
-        Q: 0.8,
-        amp: 0.04 + Math.random() * 0.08,
-        decay: 0.05 + Math.random() * 0.1,
-        dur: 0.16,
-      });
-    }
-    if (Math.random() < 0.012) {
-      for (let i = 0; i < 4; i++) {
-        this.#burst(this.rustle, t0 + i * 0.045 + Math.random() * 0.02, {
-          freq: 900 + Math.random() * 1800, type: 'bandpass', Q: 0.7, amp: 0.1, decay: 0.12, dur: 0.18,
-        });
-      }
-    }
+    this.resume.tick(t0);
     // water babble wanders
     this.babble.frequency.setTargetAtTime(350 + Math.random() * 900, t0, 0.04);
     if (Math.random() < 0.18) {
@@ -242,14 +222,18 @@ export class Soundscape {
     if (!this.enabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     this._right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-    const base = { resume: 0.9, experience: 0.75, projects: 0.85, profile: 0.8 };
+    // Resume sits about 2 dB under its earlier level (0.9): present, not dominant
+    const base = { resume: 0.72, experience: 0.75, projects: 0.85, profile: 0.8 };
     for (const el of elements) {
       const id = el.def.id;
+      if (id === 'resume') this.resume.update(el, camera, this._right);
       el.group.getWorldPosition(this._v);
       this._v.y += 2.2;
       const d = this._v.distanceTo(camera.position);
-      let g = THREE.MathUtils.clamp(1.3 - d / 17, 0, 1);
-      g = g * g * base[id] * (focused && focused !== id ? 0.55 : 1);
+      // Resume's writing is quiet by nature, so its falloff is gentler: still positional, but it
+      // carries to the overview and fades out across the hub
+      let g = id === 'resume' ? Math.pow(THREE.MathUtils.clamp(1.3 - d / 20, 0, 1), 1.6) : THREE.MathUtils.clamp(1.3 - d / 17, 0, 1) ** 2;
+      g *= base[id] * (focused && focused !== id ? 0.55 : 1) * (id === 'resume' && focused === id ? 1.35 : 1);
       this.bus[id].gain.setTargetAtTime(g, now, 0.3);
       const dir = this._v.sub(camera.position).normalize();
       this.pan[id].pan.setTargetAtTime(THREE.MathUtils.clamp(dir.dot(this._right) * 0.85, -1, 1), now, 0.3);

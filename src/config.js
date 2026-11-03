@@ -10,7 +10,8 @@ const deg = THREE.MathUtils.degToRad;
 // Experience Air's, Projects Water's, Profile Earth's). Array order is the dock
 // and arrow-key order, and it runs contiguously around the ring.
 //
-// `glyph` names the placeholder symbol until the destination glyphs exist.
+// `glyph` names the station's symbol: Resume has its own; the others still borrow an
+// element's triangle until their glyphs exist.
 // `url` is where "Open" leads (internal path or external address); leave it
 // empty to hide the link. `envGlow` places a coloured light on the horizon of
 // the reflection environment, behind the station.
@@ -19,7 +20,7 @@ export const ELEMENTS = [
     id: 'resume',
     key: '1',
     name: 'Resume',
-    glyph: 'fire',
+    glyph: 'resume',
     color: '#e8c48a',
     azimuth: deg(-45),
     eyebrow: 'Background',
@@ -32,7 +33,7 @@ export const ELEMENTS = [
     ],
     url: '/resume/',
     envGlow: { intensity: 3.0, size: 5, y: 4 },
-    view: { distance: 10.8, height: 4.3, swing: deg(18), targetY: 3.2 },
+    view: { distance: 12.8, height: 5.0, swing: deg(18), targetY: 3.75 },
   },
   {
     id: 'profile',
