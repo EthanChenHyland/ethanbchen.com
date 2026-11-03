@@ -43,6 +43,11 @@ const RECOMPOSE = {
   breathRadius: 0.018, // ±1.8% of the distance
 };
 
+// The same recomposition while a station is focused, around its own settled focus view: a camera
+// left more than about 20° above it, or well outside the dead zone in distance, drifts back to it.
+// No breathing (the focus orbit is its own motion). Only stations listed here take part.
+const FOCUS_RECOMPOSE = { resume: { trigger: THREE.MathUtils.degToRad(20) } };
+
 export class App {
   constructor(canvas, { onProgress } = {}) {
     this.canvas = canvas;
@@ -218,6 +223,17 @@ export class App {
     this.uniforms.uPointScale.value = (h * this.dpr) / (2 * Math.tan(fovRad / 2));
   }
 
+  /** Recomposition settings for a focused station, referenced to its own settled focus view. */
+  #focusRecompose(id) {
+    this._focusRecomp ??= {};
+    return (this._focusRecomp[id] ??= (() => {
+      const v = this.focusView(id);
+      const radius = v.pos.distanceTo(v.target);
+      const elevation = Math.asin((v.pos.y - v.target.y) / radius);
+      return { ...RECOMPOSE, elevation, radius, trigger: elevation + FOCUS_RECOMPOSE[id].trigger, breathElev: 0, breathRadius: 0 };
+    })());
+  }
+
   focusView(id) {
     const def = ELEMENTS.find((d) => d.id === id);
     const S = stationPosition(def);
@@ -283,6 +299,7 @@ export class App {
     // a camera left looking almost straight down spirals back to a readable height, but only while
     // the idle overview orbit runs (any input stops auto-rotate, and with it this)
     if (c.autoRotate && !this.focused && !this.rig.busy && !this.introActive) this.rig.recompose(dt, RECOMPOSE);
+    else if (c.autoRotate && FOCUS_RECOMPOSE[this.focused] && !this.rig.busy) this.rig.recompose(dt, this.#focusRecompose(this.focused));
     else this.rig.endRecompose();
     this.fade = Math.max(0, this.fade - dt * 0.55);
     this.post.finish.uniforms.uFade.value = this.fade * this.fade;
