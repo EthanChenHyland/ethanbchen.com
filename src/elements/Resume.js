@@ -1,20 +1,31 @@
 import * as THREE from 'three';
 import { patchMaterial } from '../gl/patch.js';
-import { hashGLSL, worldPosVaryingVertex } from '../gl/glsl.js';
+import { worldPosVaryingVertex } from '../gl/glsl.js';
 import { mulberry32, noise1 } from '../gl/noise.js';
 import { createPedestal } from '../world/Platform.js';
 import { stationPosition } from '../config.js';
 
-const FOLIO_Y = 2.62; // centre of the sheet above the floor
-const COLS = 8;
+const FOLIO_Y = 3.2; // centre of the sheet above the floor
+const COLS = 6;
 const ROWS = 10;
 // Miura-ori unit: parallelogram with sides A (along a row) and B (across rows) at sector angle GAMMA.
 const GAMMA = THREE.MathUtils.degToRad(65);
-const B = 0.3;
-const A = 0.82 * B;
-const FLAT_W = COLS * A + B * Math.cos(GAMMA);
-const FLAT_H = ROWS * B * Math.sin(GAMMA);
-const VOL_HALF = new THREE.Vector3(1.6, 1.9, 1.6);
+const B = 0.45;
+const A = 1.1 * B;
+const BC = B * Math.cos(GAMMA);
+const BS = B * Math.sin(GAMMA);
+const FLAT_W = COLS * A + BC;
+const FLAT_H = ROWS * BS;
+const VOL_HALF = new THREE.Vector3(2.5, 2.7, 2.5);
+const STYLUS_SCALE = 1.5; // the probe has to read from across the platform
+
+// Printed layout in flat page coordinates (0..1): 28 body rows (a heading, five
+// lines and a gap per section) plus three header lines. Each line is written,
+// and later fades, on its own.
+const BODY_TOP = 0.805;
+const ROW_H = 0.0255;
+const LINES = 31; // 0..27 body, 28 name, 29 contact, 30 rule
+const X0 = 0.1;
 
 /**
  * Rigid Miura fold of the sheet for fold amount f (0 flat → 1 fully collapsed).
@@ -29,40 +40,48 @@ function miura(f) {
   return { p, h, q, r };
 }
 
-// Ruled "printed" layout on the front of the page, in flat page coordinates (0..1).
+const lineY = (i) => (i < 28 ? BODY_TOP - (i + 0.5) * ROW_H : [0.9015, 0.862, 0.8375][i - 28]);
+const smooth = (t) => t * t * (3 - 2 * t);
+
 const PAPER_GLSL = /* glsl */ `
-uniform float uTime;
-uniform float uReveal;
 uniform float uGlow;
+uniform float uInkGain;
 uniform vec3 uLightW;
 uniform vec3 uLightCol;
 uniform sampler2D uNoise2D;
+uniform float uLineEnd[${LINES}];
+uniform float uLineInk[${LINES}];
+uniform float uLineW[${LINES}];
 varying vec2 vPage;
 varying vec2 vFace;
 varying vec3 vWPos;
-${hashGLSL}
 float bar(vec2 uv, float y0, float y1, float x1) {
   vec2 aa = fwidth(uv) * 1.2;
   float v = smoothstep(y0 - aa.y, y0 + aa.y, uv.y) * (1.0 - smoothstep(y1 - aa.y, y1 + aa.y, uv.y));
-  float u = smoothstep(0.1 - aa.x, 0.1 + aa.x, uv.x) * (1.0 - smoothstep(x1 - aa.x, x1 + aa.x, uv.x));
+  float u = smoothstep(${X0.toFixed(2)} - aa.x, ${X0.toFixed(2)} + aa.x, uv.x) * (1.0 - smoothstep(x1 - aa.x, x1 + aa.x, uv.x));
   return v * u;
 }
+// how much of line i is showing at x: written up to its end, then receding unevenly as its ink fades
+float shown(int i, vec2 uv) {
+  float aa = fwidth(uv.x) * 1.5;
+  float written = 1.0 - smoothstep(uLineEnd[i] - aa, uLineEnd[i] + aa, uv.x);
+  float n = texture(uNoise2D, uv * vec2(5.0, 9.0) + float(i) * 0.137).r;
+  return written * smoothstep(n * 0.45, n * 0.45 + 0.3, uLineInk[i]);
+}
+float lineX1(int i) { return ${X0.toFixed(2)} + uLineW[i] * 0.8; }
+// branch-free so derivatives stay valid
 float inkMask(vec2 uv) {
-  float m = bar(uv, 0.885, 0.918, 0.56);              // name
-  m = max(m, bar(uv, 0.858, 0.866, 0.74) * 0.7);      // contact line
-  m = max(m, bar(uv, 0.836, 0.839, 0.9) * 0.6);       // rule
-  // body: four sections of a heading and four lines (branch-free so derivatives stay valid)
-  float rowH = 0.0255;
-  float row = floor((0.805 - uv.y) / rowH);
+  float m = bar(uv, 0.885, 0.918, lineX1(28)) * shown(28, uv);
+  m = max(m, bar(uv, 0.858, 0.866, lineX1(29)) * 0.8 * shown(29, uv));
+  m = max(m, bar(uv, 0.836, 0.839, lineX1(30)) * 0.7 * shown(30, uv));
+  float row = floor((${BODY_TOP} - uv.y) / ${ROW_H});
   float inBody = step(0.0, row) * step(row, 27.5);
-  float k = mod(row, 7.0);
-  float head = step(k, 0.5);
-  float blank = step(5.5, k);
-  float w = mix(0.5 + 0.4 * hash11(row * 7.7 + 1.0), 0.3 + 0.1 * hash11(row * 3.1), head);
-  float th = mix(0.16, 0.26, head);
-  float y0 = 0.805 - (row + 0.5 + th) * rowH;
-  float y1 = 0.805 - (row + 0.5 - th) * rowH;
-  m = max(m, bar(uv, y0, y1, 0.1 + w * 0.8) * inBody * (1.0 - blank) * mix(0.55, 0.9, head));
+  int ri = int(clamp(row, 0.0, 27.0));
+  float head = step(mod(row, 7.0), 0.5);
+  float th = mix(0.17, 0.27, head);
+  float y0 = ${BODY_TOP} - (row + 0.5 + th) * ${ROW_H};
+  float y1 = ${BODY_TOP} - (row + 0.5 - th) * ${ROW_H};
+  m = max(m, bar(uv, y0, y1, lineX1(ri)) * inBody * mix(0.85, 1.0, head) * shown(ri, uv));
   return m;
 }
 `;
@@ -79,30 +98,64 @@ export class Resume {
     this.pedestal = createPedestal(ctx, def);
     this.group.add(this.pedestal.mesh);
 
-    // the folio yaws and bobs; the light volume stays upright around it
+    // the folio yaws and bobs (the stylus works in its frame); the dust volume stays upright
     this.folio = new THREE.Group();
     this.folio.position.y = FOLIO_Y;
     this.group.add(this.folio);
 
+    this._grid = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    this.zMid = 0;
+    this.#initLines();
     this.#buildSheet(ctx);
+    this.#buildStylus();
     this.#buildVolume(ctx);
     this.#buildFibers(ctx);
 
-    // the station's warm key light sits behind the sheet (the folio keeps its printed
-    // side to the viewer): it pools on the floor like the fire did and shines through the paper
-    this.light = new THREE.PointLight(0xffc58c, 40, 22, 2);
-    this.light.position.set(0, -0.1, -1.1);
-    this.folio.add(this.light);
+    // support light behind the sheet keeps it sculptural and pools on the floor;
+    // the stylus tip carries the moving key light
+    this.fill = new THREE.PointLight(0xffc58c, 14, 22, 2);
+    this.fill.position.set(0, -0.1, -1.6);
+    this.folio.add(this.fill);
 
-    this.hit = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 5.2, 16), new THREE.MeshBasicMaterial());
-    this.hit.position.y = 2.6;
+    this.hit = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 6.4, 16), new THREE.MeshBasicMaterial());
+    this.hit.position.y = 3.2;
     this.hit.visible = false;
     this.hit.userData.elementId = def.id;
     this.group.add(this.hit);
 
     this.yaw = null;
     this._v = new THREE.Vector3();
-    this._grid = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    this._p = new THREE.Vector3();
+    this._n = new THREE.Vector3();
+    this._d = new THREE.Vector3();
+    this._q = new THREE.Quaternion();
+  }
+
+  // ---------------------------------------------------------------- page & ink
+
+  #initLines() {
+    const rand = mulberry32(31);
+    this.lineW = new Float32Array(LINES);
+    for (let r = 0; r < 28; r++) {
+      const k = r % 7;
+      this.lineW[r] = k === 6 ? 0 : k === 0 ? 0.3 + 0.12 * rand() : 0.5 + 0.42 * rand();
+    }
+    this.lineW.set([0.58, 0.8, 1.0], 28);
+    this.lineEnd = new Float32Array(LINES);
+    this.lineInk = new Float32Array(LINES);
+    this.lineFade = new Float32Array(LINES);
+    // start mid-life: part of the page already written, at varying strength
+    for (let i = 0; i < LINES; i++) {
+      this.lineFade[i] = 0.012 + 0.028 * rand();
+      if (this.lineW[i] > 0 && rand() < 0.55) {
+        this.lineEnd[i] = X0 + this.lineW[i] * 0.8;
+        this.lineInk[i] = 0.25 + 0.7 * rand();
+      }
+    }
+  }
+
+  #lineX1(i) {
+    return X0 + this.lineW[i] * 0.8;
   }
 
   #buildSheet(ctx) {
@@ -118,7 +171,7 @@ export class Resume {
       for (let i = 0; i < COLS; i++) {
         for (const [di, dj] of quad) {
           const gi = i + di, gj = j + dj;
-          page.set([(gi * A + (gj % 2) * B * Math.cos(GAMMA)) / FLAT_W, (gj * B * Math.sin(GAMMA)) / FLAT_H], v * 2);
+          page.set([(gi * A + (gj % 2) * BC) / FLAT_W, (gj * BS) / FLAT_H], v * 2);
           corner.set([di, dj], v * 2);
           v++;
         }
@@ -130,14 +183,16 @@ export class Resume {
     geo.setAttribute('aFace', new THREE.BufferAttribute(corner, 2));
 
     this.paperU = {
-      uTime: ctx.uniforms.uTime,
-      uReveal: { value: 0 },
       uGlow: { value: 1 },
-      uLightW: { value: new THREE.Vector3() }, // where the glow comes from: just behind the middle of the sheet
-      uLightCol: { value: new THREE.Color(0xffd2a1) },
+      uInkGain: { value: 0.8 },
+      uLightW: { value: new THREE.Vector3() },
+      uLightCol: { value: new THREE.Color(0xffc58c) },
       uNoise2D: { value: ctx.noise2D },
+      uLineEnd: { value: this.lineEnd },
+      uLineInk: { value: this.lineInk },
+      uLineW: { value: this.lineW },
     };
-    const mat = new THREE.MeshStandardMaterial({ color: '#cfc6b5', roughness: 0.84, metalness: 0, side: THREE.DoubleSide });
+    const mat = new THREE.MeshStandardMaterial({ color: '#e4d9c6', roughness: 0.86, metalness: 0, side: THREE.DoubleSide });
     patchMaterial(mat, {
       key: 'resume-paper',
       uniforms: this.paperU,
@@ -152,28 +207,19 @@ export class Resume {
             vec4 fib2 = texture(uNoise2D, vPage * vec2(17.0, 22.0) + 0.3);
             diffuseColor.rgb *= 0.9 + 0.08 * fib.r + 0.06 * fib2.g;
             float edge = min(min(vFace.x, 1.0 - vFace.x), min(vFace.y, 1.0 - vFace.y));
-            diffuseColor.rgb *= mix(0.86, 1.0, smoothstep(0.0, 0.07, edge));   // pressed creases
-            // the print only resolves as the page opens; folded, it would alias into stripes
-            if (gl_FrontFacing) diffuseColor.rgb *= 1.0 - 0.72 * inkMask(vPage) * smoothstep(0.15, 0.85, uReveal);
+            diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(0.0, 0.06, edge));   // pressed creases
+            if (gl_FrontFacing) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.028, 0.027), inkMask(vPage) * uInkGain);
             else diffuseColor.rgb *= vec3(0.97, 0.94, 0.88);
           }`,
         emissivemap_fragment: /* glsl */ `
           {
-            // light from the lamp inside the fold glows through the thin paper
+            // the support light behind the sheet shines through the faces turned away from it
             vec3 nW = inverseTransformDirection(normal, viewMatrix);
             vec3 toL = uLightW - vWPos;
             float d2 = dot(toL, toL);
             float ndl = dot(nW, toL * inversesqrt(d2));
             float atten = 1.0 / (1.0 + d2 * 1.1);
-            // light behind the sheet shines through the faces turned away from it
-            totalEmissiveRadiance += uLightCol * diffuseColor.rgb * (0.04 + max(-ndl, 0.0) * 0.9) * atten * uGlow;
-            // printed lines light up top to bottom as the page opens
-            if (gl_FrontFacing) {
-              float front = 1.05 - uReveal * 1.25;
-              float lit = smoothstep(front - 0.02, front + 0.12, vPage.y);
-              float scan = exp(-pow((vPage.y - front) * 22.0, 2.0)) * step(0.02, uReveal) * (1.0 - smoothstep(0.85, 1.0, uReveal));
-              totalEmissiveRadiance += vec3(1.0, 0.78, 0.5) * inkMask(vPage) * (lit * 0.06 + scan * 0.5) * uReveal;
-            }
+            totalEmissiveRadiance += uLightCol * diffuseColor.rgb * (0.03 + max(-ndl, 0.0) * 0.9) * atten * uGlow;
           }`,
       },
     });
@@ -184,7 +230,232 @@ export class Resume {
     this.folio.add(this.sheet);
   }
 
-  /** Dust hanging in the lamplight: the fire's ray-marched volume, re-densified as a soft halo. */
+  // ---------------------------------------------------------------- stylus
+
+  /** Machined writing probe: a needle tip at the origin, body along +Y. */
+  #buildStylus() {
+    const prof = [
+      [0, 0], [0.004, 0.012], [0.011, 0.07], [0.017, 0.1], [0.024, 0.165], [0.024, 0.2], [0.032, 0.21],
+      [0.032, 0.262], [0.026, 0.272], [0.026, 0.64], [0.03, 0.65], [0.03, 1.07], [0.035, 1.08], [0.035, 1.16],
+      [0.022, 1.21], [0.0, 1.23],
+    ].map(([r, y]) => new THREE.Vector2(r, y));
+    const geo = new THREE.LatheGeometry(prof, 32);
+    const mat = new THREE.MeshStandardMaterial({ color: '#b6b9bd', metalness: 0.95, roughness: 0.26 });
+    patchMaterial(mat, {
+      key: 'resume-stylus',
+      vertexHeader: 'varying vec3 vSP;',
+      vertex: { begin_vertex: '#include <begin_vertex>\nvSP = position;' },
+      fragmentHeader: 'varying vec3 vSP; uniform float uTipGlow;',
+      uniforms: { uTipGlow: { value: 1 } },
+      fragment: {
+        roughnessmap_fragment: /* glsl */ `
+          float roughnessFactor = roughness;
+          {
+            // knurled grip, a darker anodised body section
+            float grip = step(0.272, vSP.y) * step(vSP.y, 0.64);
+            float knurl = step(0.0, sin(atan(vSP.z, vSP.x) * 40.0 + vSP.y * 260.0)) * step(0.0, sin(atan(vSP.z, vSP.x) * 40.0 - vSP.y * 260.0));
+            diffuseColor.rgb *= mix(1.0, 0.45 + 0.25 * knurl, grip);
+            roughnessFactor = mix(roughnessFactor, 0.5, grip);
+            float body = step(0.65, vSP.y) * step(vSP.y, 1.07);
+            diffuseColor.rgb *= mix(1.0, 0.32, body);
+          }`,
+        emissivemap_fragment: /* glsl */ `
+          // warm signal ring at the collar
+          totalEmissiveRadiance += vec3(1.0, 0.72, 0.42) * (step(0.232, vSP.y) * step(vSP.y, 0.242)) * 3.0 * uTipGlow;`,
+      },
+    });
+    this.stylusMat = mat;
+    this.stylus = new THREE.Mesh(geo, mat);
+    this.stylus.scale.setScalar(STYLUS_SCALE);
+    this.stylus.castShadow = true;
+    this.folio.add(this.stylus);
+
+    this.tipMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.78, 0.5).multiplyScalar(8), toneMapped: true });
+    this.tip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8), this.tipMat);
+    this.stylus.add(this.tip);
+
+    // the moving key light rides just off the tip, on the writing side
+    this.light = new THREE.PointLight(0xffc896, 12, 14, 2);
+    this.light.castShadow = true;
+    this.light.shadow.mapSize.set(512, 512);
+    this.light.shadow.camera.near = 0.05;
+    this.light.shadow.camera.far = 6;
+    this.light.shadow.bias = -0.002;
+    this.light.shadow.normalBias = 0.02;
+    this.folio.add(this.light);
+
+    this.tipPos = new THREE.Vector3();
+    this.tipDir = new THREE.Vector3(0, 1, 0.4).normalize();
+    this.mode = 'start';
+    this.line = 0;
+    this.writeX = X0;
+    this.trip = null;
+  }
+
+  /** Point and front normal on the folded sheet at page coordinates (u, v), in folio space. */
+  #surface(u, v, outP, outN) {
+    const g = this._grid;
+    const jf = THREE.MathUtils.clamp((v * FLAT_H) / BS, 0, ROWS - 1e-4);
+    const j = Math.floor(jf), t = jf - j;
+    const xoff = THREE.MathUtils.lerp((j % 2) * BC, ((j + 1) % 2) * BC, t);
+    const fi = THREE.MathUtils.clamp((u * FLAT_W - xoff) / A, 0, COLS - 1e-4);
+    const i = Math.floor(fi), s = fi - i;
+    const k = (jj, ii) => (jj * (COLS + 1) + ii) * 3;
+    const a = k(j, i), b = k(j, i + 1), c = k(j + 1, i), d = k(j + 1, i + 1);
+    for (let e = 0; e < 3; e++) {
+      const bottom = g[a + e] + (g[b + e] - g[a + e]) * s;
+      const top = g[c + e] + (g[d + e] - g[c + e]) * s;
+      outP.setComponent(e, bottom + (top - bottom) * t - (e === 2 ? this.zMid : 0));
+    }
+    const ux = g[b] - g[a], uy = g[b + 1] - g[a + 1], uz = g[b + 2] - g[a + 2];
+    const wx = g[c] - g[a], wy = g[c + 1] - g[a + 1], wz = g[c + 2] - g[a + 2];
+    outN.set(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx).normalize();
+  }
+
+  /** Choose a faded line to write next, away from the current one. */
+  #pickLine() {
+    const cands = [];
+    for (let i = 0; i < LINES; i++) if (this.lineW[i] > 0 && i !== this.line) cands.push(i);
+    cands.sort((x, y) => this.lineInk[x] - this.lineInk[y]);
+    const pool = cands.slice(0, 6).filter((i) => Math.abs(lineY(i) - lineY(this.line)) > 0.15);
+    return (pool.length ? pool : cands)[Math.floor(this.rand() * Math.min(pool.length || cands.length, 6))];
+  }
+
+  /** Start a flight from the current tip position to a page point (or a fixed folio-space point). */
+  #fly(to, { duration, wide = true, next }) {
+    const side = this.rand() < 0.5 ? -1 : 1;
+    this.trip = { from: this.tipPos.clone(), fromN: this._lastN?.clone() ?? new THREE.Vector3(0, 0, 1), to, k: 0, duration, wide, side, next };
+    this.mode = 'fly';
+  }
+
+  #startLine(i) {
+    this.line = i;
+    this.writeX = X0;
+    this.lineEnd[i] = X0;
+    this.lineInk[i] = 1;
+  }
+
+  #stepStylus(dt, time, hk, focused) {
+    const P = this._p, N = this._n;
+    const speed = 1 + 0.6 * hk;
+    let pen = 0; // 1 while the tip is on the paper
+
+    const finishing = ['final', 'parked'].includes(this.mode) || (this.mode === 'fly' && ['final', 'parked'].includes(this.trip.next));
+    if (focused && !finishing) {
+      this.#fly({ u: 0.12, v: 0.93 }, { duration: 0.75, wide: false, next: 'final' });
+    } else if (!focused && ['final', 'parked'].includes(this.mode)) {
+      this.mode = 'idle';
+    } else if (!focused && this.mode === 'fly' && this.trip.next !== 'write') {
+      this.trip.next = 'write';
+      this.trip.to = { line: this.#pickLine() };
+    }
+
+    if (this.mode === 'start' || this.mode === 'idle') {
+      const i = this.#pickLine();
+      if (this.mode === 'start') {
+        this.#surface(X0, lineY(i), P, N);
+        this.tipPos.copy(P).addScaledVector(N, 0.4);
+        this._lastN = N.clone();
+      }
+      this.#fly({ line: i }, { duration: 2.2, next: 'write' });
+    }
+
+    if (this.mode === 'write') {
+      this.writeX = Math.min(this.writeX + dt * 0.16 * speed, this.#lineX1(this.line));
+      this.lineEnd[this.line] = this.writeX;
+      this.lineInk[this.line] = 1;
+      this.#surface(this.writeX, lineY(this.line), P, N);
+      const jitter = 0.004 * Math.sin(time * 37.0) + 0.003 * Math.sin(time * 23.0);
+      this.tipPos.copy(P).addScaledVector(N, 0.012 + jitter);
+      this._lastN = N.clone();
+      pen = 1;
+      if (this.writeX >= this.#lineX1(this.line)) {
+        // a short hop to the next line in the section, or lift off and travel elsewhere
+        const below = this.line + 1;
+        if (this.line < 27 && this.lineW[below] > 0 && this.rand() < 0.55) {
+          this.#fly({ line: below }, { duration: 0.6, wide: false, next: 'write' });
+        } else {
+          this.#fly({ line: this.#pickLine() }, { duration: (2.0 + this.rand() * 0.9) / speed, next: 'write' });
+        }
+      }
+    }
+
+    if (this.mode === 'final') {
+      // the closing pass: a fast zigzag down the page that resolves every line it passes
+      this.finalK = Math.min(1, (this.finalK ?? 0) + dt / 1.5);
+      const k = this.finalK;
+      const v = 0.93 - k * 0.86;
+      const u = 0.14 + 0.74 * (0.5 - 0.5 * Math.cos(k * Math.PI * 9));
+      this.#surface(u, v, P, N);
+      this.tipPos.copy(P).addScaledVector(N, 0.015);
+      this._lastN = N.clone();
+      pen = 1;
+      for (let i = 0; i < LINES; i++) {
+        if (this.lineW[i] > 0 && lineY(i) > v) {
+          this.lineEnd[i] = this.#lineX1(i);
+          this.lineInk[i] = Math.min(1, this.lineInk[i] + dt * 3);
+        }
+      }
+      if (k >= 1) {
+        this.finalK = 0;
+        this.#fly({ park: true }, { duration: 0.9, wide: false, next: 'parked' });
+      }
+    }
+
+    if (this.mode === 'parked') {
+      this.#surface(0.97, 0.99, P, N);
+      this.tipPos.copy(P).addScaledVector(N, 0.16).add(this._v.set(0.06, 0.12, 0));
+    }
+
+    if (this.mode === 'fly') {
+      const tr = this.trip;
+      tr.k = Math.min(1, tr.k + dt / tr.duration);
+      const e = smooth(tr.k);
+      // the destination is evaluated live: the sheet keeps moving while the stylus travels
+      const to = this._v;
+      const toN = N;
+      if (tr.to.park) {
+        this.#surface(0.97, 0.99, to, toN);
+        to.addScaledVector(toN, 0.16).add(this._d.set(0.06, 0.12, 0));
+      } else {
+        const tu = tr.to.line !== undefined ? X0 : tr.to.u;
+        const tv = tr.to.line !== undefined ? lineY(tr.to.line) : tr.to.v;
+        this.#surface(tu, tv, to, toN);
+        to.addScaledVector(toN, 0.012);
+      }
+      const lift = tr.wide ? 1.0 : 0.3;
+      const swing = tr.wide ? 1.5 : 0;
+      const c1 = tr.from.clone().addScaledVector(tr.fromN, lift).add(this._d.set(tr.side * swing, 0.5 * lift, 0));
+      const c2 = to.clone().addScaledVector(toN, lift).add(this._d.set(tr.side * swing * 0.8, 0.7 * lift, 0));
+      const u1 = 1 - e;
+      this.tipPos
+        .copy(tr.from).multiplyScalar(u1 * u1 * u1)
+        .addScaledVector(c1, 3 * u1 * u1 * e)
+        .addScaledVector(c2, 3 * u1 * e * e)
+        .addScaledVector(to, e * e * e);
+      this._lastN = toN.clone().lerp(tr.fromN, 1 - e).normalize();
+      if (tr.k >= 1) {
+        this.trip = null;
+        if (tr.next === 'write') this.#startLine(tr.to.line);
+        if (tr.next === 'final') this.finalK = 0;
+        this.mode = tr.next;
+      }
+    }
+
+    // body leans back from the paper and up; while travelling it trails its motion
+    const n = this._lastN ?? N;
+    const target = this._d.copy(n).multiplyScalar(0.55).add(this._v.set(0.22, 0.8, 0));
+    if (this.mode === 'parked') target.set(0.15, 1, 0.12);
+    target.normalize();
+    this.tipDir.lerp(target, Math.min(1, dt * 5)).normalize();
+    this.stylus.position.copy(this.tipPos);
+    this.stylus.quaternion.setFromUnitVectors(this._v.set(0, 1, 0), this.tipDir);
+    return pen;
+  }
+
+  // ---------------------------------------------------------------- atmosphere
+
+  /** Dust hanging in the stylus light: the fire's ray-marched volume, re-densified around the tip. */
   #buildVolume(ctx) {
     const steps = ctx.quality.volumeSteps;
     const geo = new THREE.BoxGeometry(VOL_HALF.x * 2, VOL_HALF.y * 2, VOL_HALF.z * 2);
@@ -193,6 +464,7 @@ export class Resume {
         uNoise: { value: ctx.noise3D },
         uTime: ctx.uniforms.uTime,
         uIntensity: { value: 1.0 },
+        uTip: { value: new THREE.Vector3() },
         uCamLocal: { value: new THREE.Vector3() },
         uBoxMin: { value: VOL_HALF.clone().negate() },
         uBoxMax: { value: VOL_HALF.clone() },
@@ -207,6 +479,7 @@ export class Resume {
         uniform sampler3D uNoise;
         uniform float uTime;
         uniform float uIntensity;
+        uniform vec3 uTip;
         uniform vec3 uCamLocal;
         uniform vec3 uBoxMin;
         uniform vec3 uBoxMax;
@@ -220,11 +493,12 @@ export class Resume {
           return vec2(max(max(max(tmin.x, tmin.y), tmin.z), 0.0), min(min(tmax.x, tmax.y), tmax.z));
         }
         float dens(vec3 p) {
-          vec3 q = p / vec3(1.15, 1.5, 1.15);
-          float fall = exp(-dot(q, q) * 2.4);
+          vec3 q = p / vec3(1.6, 2.0, 1.6);
+          vec3 tq = p - uTip;
           float n = texture(uNoise, p * 0.3 + vec3(0.0, -uTime * 0.025, uTime * 0.012)).r;
           float n2 = texture(uNoise, p * 0.85 + vec3(uTime * 0.018, -uTime * 0.04, 0.0)).g;
-          return fall * (0.18 + smoothstep(0.4, 0.9, n * 0.7 + n2 * 0.45));
+          float dust = smoothstep(0.4, 0.9, n * 0.7 + n2 * 0.45);
+          return exp(-dot(q, q) * 2.4) * (0.08 + dust) * 0.35 + exp(-dot(tq, tq) * 6.0) * (0.15 + dust) * 0.6;
         }
         float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
         void main() {
@@ -241,8 +515,7 @@ export class Resume {
             acc += dens(ro + rd * t) * dt;
             t += dt;
           }
-          vec3 col = vec3(1.0, 0.8, 0.58) * acc * 0.16 * uIntensity;
-          gl_FragColor = vec4(col, 0.0);
+          gl_FragColor = vec4(vec3(1.0, 0.8, 0.58) * acc * 0.12 * uIntensity, 0.0);
         }`,
       transparent: true,
       depthWrite: false,
@@ -258,58 +531,91 @@ export class Resume {
     this.group.add(this.volume);
   }
 
-  /** Paper fibres lifted by the lamp's warmth (the fire's GPU embers, slowed and cooled). */
+  /** Paper fibres kicked up where the stylus writes (the fire's embers, slowed, cooled and born at the tip). */
   #buildFibers(ctx) {
     const count = ctx.quality.fibers;
-    const rand = mulberry32(77);
+    this.fib = {
+      count,
+      pos: new Float32Array(count * 3),
+      vel: new Float32Array(count * 3),
+      age: new Float32Array(count).fill(1e3),
+      life: new Float32Array(count).fill(1),
+      alpha: new Float32Array(count),
+      size: new Float32Array(count),
+      next: 0,
+      acc: 0,
+    };
+    for (let i = 0; i < count; i++) this.fib.size[i] = 0.012 + this.rand() * 0.022;
     const geo = new THREE.BufferGeometry();
-    const rnd = new Float32Array(count * 4);
-    for (let i = 0; i < count; i++) rnd.set([rand(), rand(), rand(), rand()], i * 4);
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-    geo.setAttribute('aRand', new THREE.BufferAttribute(rnd, 4));
-    this.fiberU = { uTime: ctx.uniforms.uTime, uScale: ctx.uniforms.uPointScale, uNoise: { value: ctx.noise3D }, uBoost: { value: 1 } };
+    geo.setAttribute('position', new THREE.BufferAttribute(this.fib.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(this.fib.alpha, 1).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(this.fib.size, 1));
     const mat = new THREE.ShaderMaterial({
-      uniforms: this.fiberU,
+      uniforms: { uScale: ctx.uniforms.uPointScale },
       vertexShader: /* glsl */ `
-        attribute vec4 aRand;
-        uniform float uTime;
+        attribute float aAlpha;
+        attribute float aSize;
         uniform float uScale;
-        uniform sampler3D uNoise;
         varying float vAlpha;
         void main() {
-          float life = mix(6.0, 11.0, aRand.y);
-          float age = mod(uTime * (0.8 + 0.3 * aRand.z) + aRand.x * 53.0, life);
-          float k = age / life;
-          float ang = aRand.x * 6.2831853 * 5.0;
-          float rad = 0.25 + sqrt(aRand.w) * 1.05;
-          vec3 p = vec3(cos(ang) * rad, -1.0 + aRand.z * 0.8, sin(ang) * rad);
-          p.y += age * (0.16 + aRand.z * 0.16);
-          vec3 turb = texture(uNoise, vec3(p.x * 0.3 + aRand.x, p.y * 0.2 - uTime * 0.05, p.z * 0.3 + aRand.y)).rga - 0.5;
-          p += turb * 0.9 * k;
-          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = max(mix(0.014, 0.034, aRand.w * aRand.z) * uScale / -mv.z, 1.2);
-          vAlpha = smoothstep(0.0, 0.15, k) * (1.0 - smoothstep(0.55, 1.0, k));
-          vAlpha *= 0.6 + 0.4 * sin(uTime * 2.1 + aRand.x * 80.0);
+          gl_PointSize = max(aSize * uScale / -mv.z, 1.2);
+          vAlpha = aAlpha;
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uBoost;
         varying float vAlpha;
         void main() {
           float core = smoothstep(0.5, 0.0, length(gl_PointCoord - 0.5));
           core *= core;
-          gl_FragColor = vec4(vec3(1.0, 0.84, 0.62) * 4.0 * uBoost * core * vAlpha, 1.0);
+          gl_FragColor = vec4(vec3(1.0, 0.84, 0.62) * 3.5 * core * vAlpha, 1.0);
         }`,
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
     this.fibers = new THREE.Points(geo, mat);
-    this.fibers.position.y = FOLIO_Y;
     this.fibers.frustumCulled = false;
     this.fibers.renderOrder = 12;
     this.group.add(this.fibers);
   }
+
+  #stepFibers(dt, time, rate, origin) {
+    const f = this.fib;
+    f.acc += rate * dt;
+    while (f.acc >= 1) {
+      f.acc -= 1;
+      const i = f.next;
+      f.next = (f.next + 1) % f.count;
+      f.age[i] = 0;
+      f.life[i] = 1.8 + this.rand() * 2.6;
+      f.pos.set([origin.x + (this.rand() - 0.5) * 0.06, origin.y + (this.rand() - 0.5) * 0.06, origin.z + (this.rand() - 0.5) * 0.06], i * 3);
+      const a = this.rand() * Math.PI * 2;
+      const sp = 0.05 + this.rand() * 0.2;
+      f.vel.set([Math.cos(a) * sp, 0.08 + this.rand() * 0.18, Math.sin(a) * sp], i * 3);
+    }
+    for (let i = 0; i < f.count; i++) {
+      f.age[i] += dt;
+      const k = f.age[i] / f.life[i];
+      if (k >= 1) {
+        f.alpha[i] = 0;
+        continue;
+      }
+      const o = i * 3;
+      f.vel[o] += Math.sin(time * 1.3 + i) * 0.02 * dt;
+      f.vel[o + 2] += Math.cos(time * 1.1 + i * 1.7) * 0.02 * dt;
+      f.vel[o + 1] += 0.03 * dt;
+      for (let e = 0; e < 3; e++) {
+        f.vel[o + e] *= 1 - 0.6 * dt;
+        f.pos[o + e] += f.vel[o + e] * dt;
+      }
+      f.alpha[i] = Math.min(1, k * 8) * (1 - k) * (0.6 + 0.4 * Math.sin(time * 2.3 + i));
+    }
+    this.fibers.geometry.attributes.position.needsUpdate = true;
+    this.fibers.geometry.attributes.aAlpha.needsUpdate = true;
+  }
+
+  // ---------------------------------------------------------------- fold
 
   /** Fold the sheet, curl it around its vertical axis, and write flat-shaded faces. */
   #shape(fold, curl) {
@@ -335,7 +641,7 @@ export class Resume {
         zSum += z;
       }
     }
-    const zMid = zSum / ((COLS + 1) * (ROWS + 1));
+    this.zMid = zSum / ((COLS + 1) * (ROWS + 1));
     const pos = this.sheet.geometry.attributes.position;
     const nrm = this.sheet.geometry.attributes.normal;
     const P = pos.array, N = nrm.array;
@@ -347,7 +653,7 @@ export class Resume {
           const k = ((j + dj) * (COLS + 1) + i + di) * 3;
           P[v * 3] = g[k];
           P[v * 3 + 1] = g[k + 1];
-          P[v * 3 + 2] = g[k + 2] - zMid;
+          P[v * 3 + 2] = g[k + 2] - this.zMid;
           v++;
         }
         // one normal per triangle (the curl bends faces slightly out of plane)
@@ -372,32 +678,55 @@ export class Resume {
 
   update(time, dt, camera) {
     const hk = this.hoverK ?? 0;
-    const fk = THREE.MathUtils.smoothstep(this.focusK ?? 0, 0, 1);
+    const fk = smooth(THREE.MathUtils.clamp(this.focusK ?? 0, 0, 1));
+    const focused = this.ctx.app.focused === this.def.id;
 
-    // closed and breathing at rest, eases open on hover, lies open when focused
-    const idleFold = 0.7 + 0.05 * Math.sin(time * 0.55) - 0.16 * hk;
-    this.#shape(THREE.MathUtils.lerp(idleFold, 0.002, fk), THREE.MathUtils.lerp(1.5, 0.0, fk));
+    // about 60% open at rest, 75% on hover, flat when focused
+    const idleFold = 0.42 + 0.05 * Math.sin(time * 0.47) + 0.025 * Math.sin(time * 1.13 + 1.3) - 0.17 * hk;
+    this.#shape(THREE.MathUtils.lerp(idleFold, 0.002, fk), THREE.MathUtils.lerp(1.0, 0.0, fk));
 
-    // the hollow of the fold keeps turning toward the viewer with a slow sway (a sheet
-    // seen edge-on is a sliver); once focused, the page squares up to the camera
+    // the printed side keeps turning toward the viewer with a slow sway; once focused it squares up
     this.group.worldToLocal(this._v.copy(camera.position));
-    const target = Math.atan2(this._v.x, this._v.z) + (1 - fk) * 0.5 * Math.sin(time * 0.21);
+    const target = Math.atan2(this._v.x, this._v.z) + (1 - fk) * 0.3 * Math.sin(time * 0.19);
     if (this.yaw === null) this.yaw = target;
     let d = (target - this.yaw) % (Math.PI * 2);
     if (d > Math.PI) d -= Math.PI * 2;
     if (d < -Math.PI) d += Math.PI * 2;
-    this.yaw += d * Math.min(1, dt * (0.5 + 2.5 * fk));
+    this.yaw += d * Math.min(1, dt * (0.35 + 2.5 * fk));
     this.folio.rotation.y = this.yaw;
-    this.folio.rotation.x = (1 - fk) * Math.sin(time * 0.37) * 0.06 - fk * 0.05;
+    this.folio.rotation.x = (1 - fk) * Math.sin(time * 0.37) * 0.05 - fk * 0.04;
     this.folio.position.y = FOLIO_Y + Math.sin(time * 0.7) * 0.06 * (1 - fk * 0.6);
+    this.folio.updateMatrixWorld();
+
+    // older writing recedes unevenly; nothing fades while the page is being read
+    const fade = 1 - fk;
+    for (let i = 0; i < LINES; i++) {
+      if (!(this.mode === 'write' && i === this.line)) this.lineInk[i] = Math.max(0, this.lineInk[i] - this.lineFade[i] * dt * fade);
+    }
+
+    const pen = this.#stepStylus(dt, time, hk, focused);
+    const parked = this.mode === 'parked' ? 1 : 0;
+    const flick = 0.92 + 0.08 * (noise1(time * 6.3, 2) - 0.5) * 2;
+    const tipGlow = parked ? 0.25 + 0.1 * Math.sin(time * 1.6) : (0.75 + 0.25 * pen) * (1 + 0.3 * hk) * flick;
+    this.tipMat.color.setRGB(1.0, 0.78, 0.5).multiplyScalar(2 + 5 * tipGlow);
+    this.stylusMat.userData.shader?.uniforms.uTipGlow && (this.stylusMat.userData.shader.uniforms.uTipGlow.value = tipGlow);
+    // key light rides just off the tip, on the writing side of the paper
+    const n = this._lastN ?? this._n;
+    this.light.position.copy(this.tipPos).addScaledVector(n, 0.5).addScaledVector(this.tipDir, 0.1);
+    this.light.intensity = 4.5 * tipGlow;
 
     const breathe = 0.97 + 0.03 * (noise1(time * 0.9, 3) - 0.5) * 2;
-    this.light.intensity = 40 * (1 + 0.2 * hk + 0.15 * fk) * breathe;
-    this.paperU.uReveal.value = fk;
-    this.paperU.uGlow.value = THREE.MathUtils.lerp(4.0 + 1.0 * hk, 2.2, fk) * breathe;
-    this.folio.localToWorld(this.paperU.uLightW.value.set(0, -0.05, THREE.MathUtils.lerp(-0.35, -0.9, fk)));
-    this.volMat.uniforms.uIntensity.value = (1.0 + 0.4 * hk - 0.3 * fk) * breathe;
+    this.fill.intensity = THREE.MathUtils.lerp(20, 24, fk) * breathe;
+    this.paperU.uGlow.value = THREE.MathUtils.lerp(1.4 + 0.5 * hk, 1.3, fk) * breathe;
+    this.paperU.uInkGain.value = THREE.MathUtils.lerp(0.78 + 0.17 * hk, 1.0, fk);
+    this.fill.getWorldPosition(this.paperU.uLightW.value);
+
+    // fibres and dust gather around the tip
+    const tipW = this.stylus.localToWorld(this._v.set(0, 0, 0));
+    this.group.worldToLocal(tipW);
+    this.#stepFibers(dt, time, (pen ? 26 : 5) * (1 + 1.2 * hk) * (1 - 0.8 * parked), tipW);
+    this.volMat.uniforms.uTip.value.copy(tipW).y -= FOLIO_Y;
+    this.volMat.uniforms.uIntensity.value = (1.0 + 0.25 * hk) * (1 - 0.5 * fk) * breathe;
     this.volume.worldToLocal(this.volMat.uniforms.uCamLocal.value.copy(camera.position));
-    this.fiberU.uBoost.value = 1 + 0.6 * hk + 0.4 * fk;
   }
 }

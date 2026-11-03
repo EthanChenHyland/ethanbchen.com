@@ -32,7 +32,7 @@ export const ELEMENTS = [
     ],
     url: '/resume/',
     envGlow: { intensity: 3.0, size: 5, y: 4 },
-    view: { distance: 8.4, height: 3.7, swing: deg(18), targetY: 2.6 },
+    view: { distance: 10.8, height: 4.3, swing: deg(18), targetY: 3.2 },
   },
   {
     id: 'profile',
