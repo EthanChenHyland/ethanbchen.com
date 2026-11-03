@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" xmlns:c2pa="http://c2pa.org/manifest">
+  <rect width="64" height="64" rx="14" fill="#07090f"/>
+  <g fill="none" stroke-width="3" stroke-linejoin="round">
+    <path d="M32 9 52 43H12Z" stroke="#ff7a2f"/>
+    <path d="M32 55 52 21H12Z" stroke="#2aa9ff" opacity=".9"/>
+    <path d="M15 27h34" stroke="#bfe4ff"/>
+    <path d="M15 37h34" stroke="#6fd66a"/>
+  </g>
+</svg>
