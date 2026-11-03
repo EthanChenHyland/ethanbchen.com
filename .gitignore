@@ -15,3 +15,5 @@ research/*
 !research/piano-chroma.csv
 !research/minuet-full-source.mid
 !research/minuet-full-score-source.json
+.taste-skill/
+!research/desk-direction.md

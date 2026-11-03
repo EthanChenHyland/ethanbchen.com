@@ -31,24 +31,22 @@ npm run build
 npm run preview
 ```
 
-Check the preview at desktop and narrow mobile widths, including keyboard navigation, reduced motion, project links, audio playback, `/github/`, and `/resume.pdf`. Unit tests do not replace browser checks. Building and previewing do not deploy the site.
+Check the preview at 1440×900, 1280×720, 390×844 and 320×568, including the desk (drag, click, scroll-driven flights), keyboard navigation, reduced motion, `?q=low`, project links, Minuet playback, `/github/`, and `/resume.pdf`. Unit tests do not replace browser checks. Building and previewing do not deploy the site.
 
 ## Architecture
 
-- `index.html` contains the homepage content, sections, accessible controls, and inline graphics; `src/style.css` defines layout, responsive styles, and local fonts.
-- `src/main.ts` initializes the interactions and their shared abort lifecycle. `explorers.ts` handles schema/channel controls, `full-minuet.ts` follows and seeks the complete MIDI rendering, `piano.ts` synchronizes the separate captured excerpt and its playhead, and `signal.ts` handles the page trace. `content.ts` holds shared copy and helpers.
-- `hero-field.ts` / `hero-webgl.ts` turn the actual DOM name into a pressure-sensitive point field with a scroll-to-trace shader.
-- `backdrop.ts` / `backdrop-webgl.ts` own the continuous Three.js camera route, ribbon shader, chapter structures, and native anchor navigation. Native scroll controls the timeline. Ribbons ripple automatically, pulses repeat, and chapter structures drift at rest; rendering is capped at 30fps on mobile and 60fps on desktop, pauses in hidden tabs, and is disabled for reduced motion.
-- `project-worlds.ts` / `project-worlds-webgl.ts` provide one scissored renderer for the contract planes, Clarity context layers, and captured MIDI notes. Visible scenes float and rotate gently; schema plates drift independently, Clarity routing waves travel, and score lighting breathes without changing note data or playback time. These loops are capped at 30fps mobile / 60fps desktop and stop offscreen or while hidden. DOM controls, keyboard rotation, raycast selection, and native audio remain accessible.
-- `media-stage.ts` / `media-webgl.ts` render the authentic avoid.love artwork as a deformable surface with a DOM image fallback.
-- `workbench.ts` and `knight.ts` provide the movable repository index and optional legal-knight-move sketch. `pointer.ts` handles contextual pointer labels and bounded magnetic links.
-- WebGL modules are dynamically imported. Reduced motion keeps the editorial DOM edition; abort controllers and renderer cleanup handle preference changes and navigation.
-- `navigation.ts` stabilizes deep links against loading-induced layout shifts while preserving native smooth anchor scrolling and releasing immediately on user input.
-- `vite.config.ts` preserves the `/github` directory route in development and preview by redirecting to `/github/` before the SPA fallback. Homepage links use the canonical trailing slash.
-- `public/` is served at the site root and copied into `dist/`: fonts, media, piano evidence, the resume, and the existing Pond static output under `public/github/`.
-- `tests/` contains Node unit tests. Selected `research/` documents record design direction, content verification, and asset provenance; local screenshots, logs, and scratch files are not published.
-- `scripts/build-evidence.py` derives the chroma SVG and inline score drawing from captured piano evidence. It writes `public/media/chroma.svg` **and `index.html`**; it is a separate maintenance tool, not part of the npm build.
-- `scripts/build-full-minuet.py` derives the 32-measure timeline and synthesized audio from the tracked MIDI/score sources in `research/`. It requires Python 3 and FFmpeg; run it only when changing those sources. The existing 12.3-second MIR capture is independent of this full-piece listening player.
+The homepage is one scene: Ethan's desk at night in Nashville, built procedurally in Three.js, with each project as an object on it. The DOM in `index.html` holds every fact (projects, lab, experience, about, contact); WebGL only adds the desk, so the page reads the same without it.
+
+- `src/main.ts` boots the page: menu, section entrances, the lab ledger, Mosaic's board, then (if WebGL 2 is available) the desk. Scrolling through `[data-focus]` sections flies the camera to each project; hero labels are real buttons that follow their objects; clicks on the canvas are raycast to the same destinations. Keys: 1–5 projects, ←/→ step, Esc back to the top.
+- `src/quality.ts` picks a render tier (high, standard, low, static) from reduced-motion, pointer type, CPU cores, memory and `?q=`; `FrameBudget` lowers the pixel ratio and then drops bloom and shadows when frames stay slow (`?noadapt` disables it).
+- `src/world/World.ts` owns the renderer, the views (`SHOTS`), focus, picking, label projection, the render loop and pausing when no desk section is on screen or the tab is hidden. Reduced motion renders on demand with instant cuts.
+- `src/world/CameraRig.ts` and `src/world/PostFX.ts` are adapted from 4elements (MIT, see `THIRD_PARTY_NOTICES.md`).
+- Desk pieces in `src/world/`: `room.ts` (desk, lamp, window, procedural skyline with the AT&T Building), `city.ts` (City Settlers miniature with policy-driven growth), `promptoff.ts` (report printer and score screen), `towerlogic.ts` (monitor drawing the pixels → perception → state → decision pipeline), `piano.ts` (keyboard and piano roll from the real Minuet note list), `mosaic.ts` (prints that organise into a board), `props.ts` (FunChessEngine self-play replay, the frog, the lab notebooks, mug and headphones).
+- `src/ui/demos.ts` holds the chapter interactions that also work without WebGL: the policy buttons, the Prompt-Off scorer, the TowerLogic stage text, the Minuet player, Mosaic's draggable board and the lab previews. `src/content.ts` holds shared data and the pure scoring helpers that the tests cover.
+- About photographs: add 3–5 entries to `PHOTOS` in `src/content.ts` (files under `public/media/photos/`); the About section shows them in a row and stays unchanged until then.
+- `vite.config.ts` preserves the `/github` directory route in development and preview by redirecting to `/github/` before the SPA fallback.
+- `public/` is served at the site root: fonts, media, project screenshots, Nashville photographs (credited in the footer and `public/media/nashville/credits.json`), piano data, the resume, and the Pond static output under `public/github/`.
+- `scripts/build-full-minuet.py` regenerates the Minuet timeline and audio from the tracked MIDI; it is not part of the npm build.
 
 ## Deployment
 
@@ -58,7 +56,7 @@ The apex DNS should use GitHub Pages' four A records (`185.199.108.153`, `185.19
 
 ## Replace the resume
 
-`public/resume.pdf` is the current supplied tech resume, copied unmodified. Its stable public URL is `/resume.pdf`; keep that filename when a newer resume arrives.
+`public/resume.pdf` is the current general resume (`Ethan_Chen_Resume_General_Final.pdf`, November 2026). Its stable public URL is `/resume.pdf`; keep that filename when a newer resume arrives.
 
 1. Review the updated tech PDF and confirm it is the version intended for public download.
 2. Copy it without re-exporting or modifying the PDF. Substitute its actual path below:
