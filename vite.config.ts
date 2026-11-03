@@ -13,4 +13,6 @@ function pondRoute(server: ViteDevServer | PreviewServer) {
 
 export default defineConfig({
   plugins: [{ name: 'pond-directory-route', configureServer: pondRoute, configurePreviewServer: pondRoute }],
+  // three.js and the desk load as one lazy chunk after the page is readable
+  build: { chunkSizeWarningLimit: 700 },
 });

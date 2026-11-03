@@ -1,144 +1,291 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f2efe8" />
-  <meta name="description" content="Ethan B. Chen builds software around intelligence, sound, and unusual systems. Selected work in AI evaluation, desktop software, music analysis, and the creative web." />
-  <meta property="og:title" content="Ethan B. Chen — Code, experiments, systems." />
-  <meta property="og:description" content="A few questions, taken further. Selected software and experiments by Ethan B. Chen." />
-  <meta property="og:type" content="website" />
-  <title>Ethan B. Chen — Code, experiments, systems.</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="preload" href="/fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="/fonts/manrope.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/src/style.css" />
-  <script type="module" src="/src/main.ts"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ethan B. Chen</title>
+  <meta name="description" content="Ethan B. Chen studies computer science at Vanderbilt and builds multiplayer simulations, LLM evaluation tools, computer vision pipelines and music software. His desk, explorable.">
+  <meta name="theme-color" content="#08090a">
+  <meta property="og:title" content="Ethan B. Chen">
+  <meta property="og:description" content="Computer science at Vanderbilt. City Settlers, The Great Prompt-Off, TowerLogic, Piano MIR, Mosaic and a lab of smaller builds, on one desk in Nashville.">
+  <meta property="og:url" content="https://ethanbchen.com/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/switzer-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/switzer-400.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="masthead">
-    <a class="wordmark" href="#top" aria-label="Ethan B. Chen, beginning">E<span class="mark-dot">.</span>B<span class="mark-dot">.</span>C<span class="mark-dot">.</span></a>
-    <span class="mast-note mono">AN ONGOING EXPERIMENT</span>
-    <nav aria-label="Main navigation"><a href="#work">Work <span>01</span></a><a href="#about">About <span>02</span></a><a href="#contact">Contact <span>03</span></a></nav>
+  <a class="skip" href="#work">Skip to the work</a>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="frog-mark" viewBox="0 0 32 24"><path fill="currentColor" d="M8 2.5a4.5 4.5 0 0 1 4.3 3.2c1.2-.3 2.4-.4 3.7-.4s2.5.1 3.7.4A4.5 4.5 0 1 1 27.3 9c2 1.6 3.2 3.6 3.2 5.9 0 5-6.5 8.6-14.5 8.6S1.5 19.9 1.5 14.9c0-2.3 1.2-4.3 3.2-5.9A4.5 4.5 0 0 1 8 2.5Zm0 2.6a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8Zm16 0a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8ZM9.6 15.4a1 1 0 0 0-1.3 1.4C10 18.6 12.8 19.6 16 19.6s6-1 7.7-2.8a1 1 0 0 0-1.3-1.4c-1.4 1.3-3.6 2.1-6.4 2.1s-5-.8-6.4-2.1Z"/></symbol>
+  </svg>
+
+  <header class="bar">
+    <a class="wordmark" href="#top" aria-label="Ethan B. Chen, back to the top"><svg aria-hidden="true"><use href="#frog-mark"/></svg><span>Ethan B. Chen</span></a>
+    <nav class="bar__nav" id="menu" aria-label="Sections">
+      <a href="#work">Work</a>
+      <a href="#lab">Lab</a>
+      <a href="#experience">Experience</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a class="btn btn--line bar__resume" href="/resume.pdf">Resume</a>
+    <button class="bar__toggle" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
   </header>
-  <main id="main">
-    <section class="hero" id="top" aria-labelledby="hero-name">
-      <div class="hero-meta mono"><span>VANDERBILT UNIVERSITY<br> COMPUTING · AI · SYSTEMS</span><span>BASED IN NASHVILLE, TN<br> OPEN TO STRANGE PROBLEMS</span></div>
-      <div class="name-stage">
-        <h1 id="hero-name"><span class="first-name">ETHAN</span><span class="last-name"><span class="middle-initial">B.</span> <span class="surname">CHEN<span class="name-period">.</span></span></span></h1>
-        <div class="hero-annotation mono" aria-hidden="true"><span class="crosshair">+</span><span>CODE,<br> EXPERIMENTS,<br> SYSTEMS.</span></div>
-        <svg class="hero-trace" viewBox="0 0 1000 480" preserveAspectRatio="none" aria-hidden="true"><path class="trace-ghost" d="M 795 25 V 135 Q 795 155 775 155 H 107 Q 87 155 87 175 V 330 Q 87 350 107 350 H 225 Q 245 350 245 370 V 480"/><path class="trace-ink" pathLength="1" d="M 795 25 V 135 Q 795 155 775 155 H 107 Q 87 155 87 175 V 330 Q 87 350 107 350 H 225 Q 245 350 245 370 V 480"/><circle cx="795" cy="25" r="4"/></svg>
-      </div>
-      <a class="hero-frog" href="/github/" aria-label="A small discovery. Enter the Pond."><img src="/media/frog.svg" width="50" height="40" alt=""/></a>
-      <button class="disturb-identity mono" type="button">DISTURB THE SIGNAL ↗</button><div class="hero-bottom"><a class="scroll-cue mono" href="#work"><span class="down-arrow">↓</span> FOLLOW THE SIGNAL</a><p>I build software around intelligence,<br class="desktop-break"> systems, and things I can’t leave alone.</p><span class="hero-edition mono">SELECTED WORK<br> 2026 — ONGOING</span></div>
-    </section>
 
-    <section class="intro section-pad" id="work" aria-labelledby="intro-title">
-      <div class="section-rule mono"><span>01 — SELECTED WORK</span><span>FOUR QUESTIONS, TAKEN FURTHER</span></div>
-      <div class="intro-layout"><span class="trace-origin" aria-hidden="true"></span><h2 id="intro-title">I like problems<br> with a little <em>noise.</em></h2><div class="intro-copy"><p>A report. A recording. A screen.<br> A feeling that won’t fit in a box.</p><p>Different inputs. The same curiosity:<br> what can software make of this?</p><div class="signal-scope" data-phase="0" role="img" aria-label="Four project transformations: report to contract, screen to context, score to evidence, story to feeling."><div class="scope-top mono"><span>THE SAME INSTINCT / FOUR INPUTS</span><span class="scope-counter">01 / 04</span></div><div class="scope-stage" aria-hidden="true"><svg viewBox="0 0 400 120" preserveAspectRatio="none"><path data-shape="0" d="M0 65 H48 V27 H112 V91 H174 V45 H244 V75 H310 V32 H400"/><path data-shape="1" d="M0 75 C48 75 58 35 105 35 S160 90 205 90 S255 25 302 25 S350 70 400 70"/><path data-shape="2" d="M0 90 H36 V68 H76 V80 H120 V30 H160 V44 H200 V72 H242 V50 H282 V22 H320 V64 H360 V45 H400"/><path data-shape="3" d="M0 72 C50 8 80 115 132 55 C178 -2 212 114 258 60 C307 2 342 103 400 35"/></svg><div class="scope-pair mono"><span class="scope-input">REPORT</span><span aria-hidden="true">→</span><span class="scope-output">CONTRACT</span></div></div><div class="scope-bottom mono"><span class="scope-instruction">SCROLL / PREVIEW THE INPUTS</span><span class="scope-track" aria-hidden="true"><i></i></span></div></div></div></div>
-      <div class="work-index mono"><a href="#prompt-off"><span>01</span> LANGUAGE <span>↘</span></a><a href="#clarity"><span>02</span> CONTEXT <span>↘</span></a><a href="#piano"><span>03</span> SOUND <span>↘</span></a><a href="#avoid"><span>04</span> FEELING <span>↘</span></a></div>
-    </section>
+  <canvas id="world" aria-hidden="true"></canvas>
+  <div class="scrim" aria-hidden="true"></div>
+  <div class="desk-labels" role="group" aria-label="Objects on the desk"></div>
+  <p class="pointer-tip" aria-hidden="true"></p>
+  <p class="toast" role="status" aria-live="polite"></p>
 
-    <section class="prompt-scene section-pad" id="prompt-off" aria-labelledby="prompt-title">
-      <div class="project-metadata mono"><span>01 / LANGUAGE → STRUCTURE</span><span>AI EVALUATION · FULL-STACK SYSTEMS</span></div>
-      <h2 id="prompt-title">The Great <span class="prompt-word">Prompt-Off<span class="serif-dot">.</span></span></h2>
-      <div class="prompt-layout">
-        <div class="prompt-copy"><p class="project-thesis">A better prompt needs<br> a better test.</p><p>A live challenge for extracting structured findings from synthetic knee MRI reports. The interesting part isn’t asking a model. It’s deciding what a correct answer means.</p><a class="project-link" href="https://github.com/EthanChenHyland/the-great-prompt-off">Explore the system <span aria-hidden="true">↗</span></a><p class="project-tech mono">NEXT.JS / TYPESCRIPT / POSTGRES</p></div>
-        <div class="evaluation-lab">
-          <div class="lab-heading mono"><span>THE EVALUATION PATH</span><span aria-hidden="true">[ IN → OUT ]</span></div>
-          <ol class="evaluation-path"><li><span class="pipeline-node" aria-hidden="true"></span><span class="mono">01 / INPUT</span><strong>Synthetic report</strong><small>Non-PHI material</small></li><li><span class="pipeline-node" aria-hidden="true"></span><span class="mono">02 / STRATEGY</span><strong>Participant prompt</strong><small>How to extract the evidence</small></li><li><span class="pipeline-node" aria-hidden="true"></span><span class="mono">03 / CONTRACT</span><strong>Six fields. Four labels.</strong><small>A strict, shared output schema</small></li><li><span class="pipeline-node" aria-hidden="true"></span><span class="mono">04 / EVALUATION</span><strong>Explainable scoring</strong><small>Public practice → hidden final set</small></li></ol>
-          <div class="schema-explorer"><p class="mono">SMALL DISTINCTIONS MATTER</p><div class="schema-statement"><span>not_reported</span><span class="not-equal" aria-hidden="true">≠</span><span class="sr-only"> is not equivalent to </span><span>absent</span></div><p class="schema-instruction">Choose a label. The contract preserves the distinction.</p><div class="schema-controls" role="group" aria-label="Clinical extraction schema labels"><button type="button" data-label="present" aria-pressed="false">present</button><button type="button" data-label="absent" aria-pressed="false">absent</button><button type="button" data-label="uncertain" aria-pressed="false">uncertain</button><button type="button" data-label="not_reported" aria-pressed="true">not_reported</button></div><p id="schema-description" aria-live="polite">Silence is not a negative finding. The report does not supply the evidence needed to call it present or absent.</p><span class="lab-footnote mono">CONTRACT SPECIMEN · NO REPORT OR MODEL RUN</span></div>
+  <main>
+    <section class="hero" id="top" data-focus="overview" aria-labelledby="hero-title">
+      <h1 id="hero-title" class="hero__name"><span class="line"><span>Ethan</span></span><span class="line line--soft"><span>B. Chen</span></span></h1>
+      <div class="hero__copy">
+        <p class="hero__lede">I build systems you can play with, from a multiplayer city game for Nashville classrooms to software that listens to piano.</p>
+        <p class="hero__meta">Computer Science and Human &amp; Organizational Development at Vanderbilt University, Nashville.</p>
+        <div class="hero__actions">
+          <a class="btn" href="#work">See the work</a>
+          <a class="text-link" href="https://github.com/EthanChenHyland">GitHub</a>
+          <a class="text-link" href="https://www.linkedin.com/in/ethanbchen/">LinkedIn</a>
+          <a class="text-link" href="mailto:ethan.b.chen@vanderbilt.edu">Email</a>
         </div>
       </div>
-      <div class="scene-exit mono"><span>THE OUTPUT IS ONLY AS USEFUL AS THE CONTRACT.</span><span aria-hidden="true">↓</span></div>
+      <ol class="desk-index" aria-label="Projects">
+        <li><a href="#city-settlers" data-piece="city"><span>City Settlers</span><span>Multiplayer city game</span></a></li>
+        <li><a href="#prompt-off" data-piece="promptoff"><span>The Great Prompt-Off</span><span>LLM evaluation platform</span></a></li>
+        <li><a href="#towerlogic" data-piece="towerlogic"><span>TowerLogic</span><span>Vision to decision</span></a></li>
+        <li><a href="#piano-mir" data-piece="piano"><span>Piano MIR</span><span>Music information retrieval</span></a></li>
+        <li><a href="#mosaic" data-piece="mosaic"><span>Mosaic</span><span>Visual collections</span></a></li>
+      </ol>
+      <p class="hero__hint"><span class="hint--fine">Drag to look around the desk. Click anything on it.</span><span class="hint--touch">Tap a project, or scroll and the desk comes to you.</span></p>
+      <p class="loading" aria-live="polite"></p>
+      <figure class="hero__still"><img src="/media/world/desk.jpg" width="800" height="500" alt="Ethan’s desk at night: a miniature city on a turntable, a report printer, a piano keyboard, a monitor, a chessboard and a small frog, under a lamp, with the Nashville skyline in the window."></figure>
     </section>
 
-    <section class="clarity-scene section-pad" id="clarity" aria-labelledby="clarity-title">
-      <div class="project-metadata mono"><span>02 / CONTEXT → ASSISTANCE</span><span>MACOS · DESKTOP AI</span></div>
-      <div class="clarity-title-row"><h2 id="clarity-title">Clarity</h2><p class="clarity-aside">Good assistance<br> starts with<br> <em>being there.</em></p></div>
-      <div class="clarity-composition">
-        <div class="channel-panel"><p class="mono">THREE WAYS INTO THE CONVERSATION</p><div class="channel-controls" role="group" aria-label="Explore Clarity input channels"><button type="button" data-channel="screen" aria-pressed="true"><span class="channel-icon" aria-hidden="true">▣</span><span>Screen<small>What’s in front of you</small></span><span aria-hidden="true">↗</span></button><button type="button" data-channel="you" aria-pressed="false"><span class="channel-icon" aria-hidden="true">◉</span><span>You<small>Microphone transcript</small></span><span aria-hidden="true">↗</span></button><button type="button" data-channel="them" aria-pressed="false"><span class="channel-icon" aria-hidden="true">◎</span><span>Them<small>System-audio transcript</small></span><span aria-hidden="true">↗</span></button></div><p id="channel-description" aria-live="polite">Screen context enters when you request assistance. Capture depends on macOS permissions and a model that accepts images.</p></div>
-        <figure class="clarity-image"><div class="overlay-mat"><svg class="channel-traces" viewBox="0 0 720 420" preserveAspectRatio="none" aria-hidden="true"><path d="M0 80 H75 Q100 80 100 105 V200 Q100 225 125 225 H720"/><path d="M0 210 H720"/><path d="M0 340 H75 Q100 340 100 315 V245 Q100 225 125 225 H720"/></svg><img src="/media/clarity-overlay.png" alt="Clarity’s current empty-state interface, rendered from its application source: Ready when you are, assistance actions, and a question composer." width="1328" height="870" loading="lazy" decoding="async" /></div><figcaption class="mono"><span>CURRENT INTERFACE / SOURCE RENDER</span><span>AN OVERLAY, NOT ANOTHER DESTINATION</span></figcaption></figure>
+    <section class="work" id="work" aria-labelledby="work-title">
+      <header class="work__intro">
+        <h2 id="work-title">The work on the desk</h2>
+        <p>Five projects, each sitting somewhere in the room above. Scroll, and the camera goes to each one; or press 1 to 5.</p>
+      </header>
+
+      <article class="chapter" id="city-settlers" data-focus="city" aria-labelledby="city-title" style="--tone: #f2b45c">
+        <div class="chapter__panel">
+          <h3 id="city-title">City Settlers</h3>
+          <p class="chapter__thesis">A multiplayer city game for Nashville classrooms.</p>
+          <p class="chapter__role">Main developer, Change++ for Nashville’s Civic Design Center. September 2026 to now.</p>
+          <p>Student teams share one map, place buildings, and balance money against pollution, population and happiness. I re-architected the game into an idle city builder with shared-resource policy mechanics: deterministic TypeScript rules on the inside, a server-authoritative Node and Socket.IO multiplayer layer around them.</p>
+          <dl class="figures">
+            <div><dt>13.9K</dt><dd>lines across 78 files in one draft pull request</dd></div>
+            <div><dt>70</dt><dd>automated tests on the rules and the server</dd></div>
+            <div><dt>13 ms</dt><dd>p95 server latency with 30 simulated students (1 ms p50)</dd></div>
+          </dl>
+          <div class="demo" data-needs-world>
+            <h4>Set the city’s policy</h4>
+            <p>The miniature builds one lot at a time, like the game idles. Choose what it builds next.</p>
+            <div class="choice" role="group" aria-label="City policy">
+              <button type="button" data-policy="housing" aria-pressed="true">Housing</button>
+              <button type="button" data-policy="transit" aria-pressed="false">Transit</button>
+              <button type="button" data-policy="parks" aria-pressed="false">Parks</button>
+            </div>
+            <p class="demo__out" id="city-out" aria-live="polite"></p>
+          </div>
+          <p class="chapter__links"><a href="https://github.com/ChangePlusPlusVandy/civicdesigncenter">Source on GitHub</a></p>
+          <p class="stack">TypeScript · React · Node · Socket.IO · Postgres · Vitest · Playwright</p>
+          <nav class="chapter__nav" aria-label="City Settlers navigation"><a href="#top">Overview</a><a href="#prompt-off">Next: The Great Prompt-Off</a></nav>
+        </div>
+        <figure class="chapter__still"><img src="/media/world/city.jpg" width="800" height="500" alt="The City Settlers miniature: a round grid city with a river, a capitol and a crane over a lot under construction." loading="lazy"></figure>
+      </article>
+
+      <article class="chapter" id="prompt-off" data-focus="promptoff" aria-labelledby="promptoff-title" style="--tone: #e2ded5">
+        <div class="chapter__panel">
+          <h3 id="promptoff-title">The Great Prompt-Off</h3>
+          <p class="chapter__thesis">A live prompt-engineering competition, scored field by field.</p>
+          <p>Participants write a strategy for pulling six findings out of synthetic knee MRI reports, try it against public reports, then submit once against a hidden set while the leaderboard runs on the projector. The hard part was trust: hidden reports and answer keys never leave the server, and the scorer accepts only exact controlled labels.</p>
+          <dl class="figures">
+            <div><dt>50</dt><dd>synthetic, non-PHI knee MRI reports</dd></div>
+            <div><dt>5</dt><dd>public test attempts per participant</dd></div>
+            <div><dt>45</dt><dd>hidden reports in the one final submission</dd></div>
+          </dl>
+          <div class="demo">
+            <h4>Score an output</h4>
+            <p class="demo__report">“Complete disruption of the anterior cruciate ligament. Medial collateral ligament intact. Medial meniscus signal may represent a tear versus degeneration. No fracture. Moderate joint effusion.”</p>
+            <div class="choice" role="group" aria-label="Model output to score">
+              <button type="button" data-output="strict" aria-pressed="false">Exact labels</button>
+              <button type="button" data-output="loose" aria-pressed="false">Clinical words</button>
+              <button type="button" data-output="eager" aria-pressed="false">Overconfident</button>
+            </div>
+            <ol class="score" id="score-out" aria-live="polite"></ol>
+            <p class="demo__note">A synthetic sample written for this page, scored with the project’s six fields and four labels: present, absent, uncertain, not_reported.</p>
+          </div>
+          <p class="chapter__links"><a href="https://the-great-prompt-off.vercel.app">Live site</a><a href="https://github.com/EthanChenHyland/the-great-prompt-off">Source on GitHub</a></p>
+          <p class="stack">Next.js · TypeScript · Supabase/PostgreSQL · OpenRouter · Vitest</p>
+          <nav class="chapter__nav" aria-label="Prompt-Off navigation"><a href="#city-settlers">Previous: City Settlers</a><a href="#towerlogic">Next: TowerLogic</a></nav>
+        </div>
+        <figure class="chapter__still chapter__still--shot"><img src="/media/shots/prompt-off.jpg" width="1440" height="900" alt="The Great Prompt-Off entry screen: participants enter an access code; five test attempts, five public test reports, forty-five hidden final reports." loading="lazy"><figcaption>The live entry screen.</figcaption></figure>
+      </article>
+
+      <article class="chapter" id="towerlogic" data-focus="towerlogic" aria-labelledby="towerlogic-title" style="--tone: #c5f04e">
+        <div class="chapter__panel">
+          <h3 id="towerlogic-title">TowerLogic</h3>
+          <p class="chapter__thesis">Screenshot in, decision out.</p>
+          <p>An experimental Clash Royale agent that plays from pixels. It pulls frames from an Android emulator, reads the hand with a PyTorch classifier, finds units with an ONNX detector, folds everything into one normalised game state, and scores candidate placements with a learned policy. A research project, not a production bot, and not affiliated with Supercell.</p>
+          <div class="demo">
+            <h4>Follow one frame</h4>
+            <div class="choice" role="group" aria-label="Pipeline stage">
+              <button type="button" data-stage="pixels" aria-pressed="false">Pixels</button>
+              <button type="button" data-stage="perception" aria-pressed="true">Perception</button>
+              <button type="button" data-stage="state" aria-pressed="false">State</button>
+              <button type="button" data-stage="decision" aria-pressed="false">Decision</button>
+            </div>
+            <p class="demo__out" id="stage-out" aria-live="polite">A 640×640 YOLO-style detector, run in ONNX Runtime, finds units and towers; a compact classifier reads the four cards in hand.</p>
+            <p class="demo__note" data-needs-world>The monitor runs a small simulation of an arena to show each stage.</p>
+          </div>
+          <p class="chapter__links"><a href="https://github.com/EthanChenHyland/TowerLogic">Source on GitHub</a></p>
+          <p class="stack">Python · OpenCV · PyTorch · ONNX Runtime · ADB</p>
+          <nav class="chapter__nav" aria-label="TowerLogic navigation"><a href="#prompt-off">Previous: The Great Prompt-Off</a><a href="#piano-mir">Next: Piano MIR</a></nav>
+        </div>
+        <figure class="chapter__still"><img src="/media/world/towerlogic.jpg" width="800" height="500" alt="The TowerLogic monitor showing an arena with detection boxes around units and towers." loading="lazy"></figure>
+      </article>
+
+      <article class="chapter" id="piano-mir" data-focus="piano" aria-labelledby="piano-title" style="--tone: #9fd0e8">
+        <div class="chapter__panel">
+          <h3 id="piano-title">Piano MIR</h3>
+          <p class="chapter__thesis">Does the recording match the score?</p>
+          <p>A Rust-first music information retrieval system for known-score performance assessment. Given a score and a WAV recording, it maps the score onto the audio timeline, checks the evidence for every expected note and its chroma, and reports timing and tempo apart from pitch.</p>
+          <div class="demo">
+            <h4>Play the test piece</h4>
+            <p>Minuet in G, BWV Anh. 114: the project’s main test pair. This is a synthesized rendering of its MIDI, 207 notes, and the keyboard on the desk plays from the same note list.</p>
+            <div class="player">
+              <button type="button" class="btn" id="minuet-play" aria-pressed="false">Play</button>
+              <p class="player__time"><output id="minuet-time">0:00 / 0:42</output> <span id="minuet-notes"></span></p>
+            </div>
+            <audio id="minuet-audio" preload="none" src="/media/minuet-full.mp3"></audio>
+            <p class="demo__note" data-needs-world>While this chapter is open, the A to K row of your keyboard plays the desk piano too.</p>
+          </div>
+          <p class="chapter__links"><a href="https://github.com/EthanChenHyland/PianoMirRustPublic">Source on GitHub</a></p>
+          <p class="stack">Rust · Python · egui · chroma · onset and tempo analysis</p>
+          <nav class="chapter__nav" aria-label="Piano MIR navigation"><a href="#towerlogic">Previous: TowerLogic</a><a href="#mosaic">Next: Mosaic</a></nav>
+        </div>
+        <figure class="chapter__still"><img src="/media/world/piano.jpg" width="800" height="500" alt="The desk keyboard with its display strip showing the Minuet in G as a piano roll." loading="lazy"></figure>
+      </article>
+
+      <article class="chapter" id="mosaic" data-focus="mosaic" aria-labelledby="mosaic-title" style="--tone: #e9a58b">
+        <div class="chapter__panel">
+          <h3 id="mosaic-title">Mosaic</h3>
+          <p class="chapter__thesis">Find it once. Keep it.</p>
+          <p>A Pinterest-style discovery app built for the Change++ Fall 2026 coding challenge: search, save, organise into collections and sections, share with privacy controls, follow, comment and message, and lay a collection out freely on a draggable Canvas. The Express and SQLite backend runs in transactions with permission checks, rate limiting and security headers, covered by end-to-end and security regression tests.</p>
+          <div class="demo">
+            <h4>Arrange a collection</h4>
+            <div class="board" id="board" aria-label="A small canvas of Nashville photographs. Drag a print, or focus it and use the arrow keys."></div>
+            <div class="choice"><button type="button" id="board-tidy">Tidy into a grid</button><button type="button" id="board-scatter">Scatter</button></div>
+          </div>
+          <p class="chapter__links"><a href="https://mosaic-f33m.onrender.com/">Live site</a><a href="https://github.com/EthanChenHyland/Fall2026-CodingChallenge">Source on GitHub</a></p>
+          <p class="stack">React · TypeScript · Express · SQLite · Docker · Playwright · Render</p>
+          <nav class="chapter__nav" aria-label="Mosaic navigation"><a href="#piano-mir">Previous: Piano MIR</a><a href="#lab">Next: the lab</a></nav>
+        </div>
+        <figure class="chapter__still chapter__still--shot"><img src="/media/shots/mosaic.jpg" width="800" height="500" alt="Mosaic’s landing page: “Find it once. Keep it.” beside a board of saved city, road and interior photographs." loading="lazy"><figcaption>The live landing page.</figcaption></figure>
+      </article>
+    </section>
+
+    <section class="lab" id="lab" aria-labelledby="lab-title">
+      <div class="lab__head">
+        <h2 id="lab-title">The lab</h2>
+        <p>Smaller builds, tools I needed, and experiments that got out of hand. They are the notebooks stacked by the window.</p>
       </div>
-      <div class="clarity-summary"><p>Screen assistance, separate conversation channels, and your choice of AI provider. Built around the unglamorous parts, too: capture permissions, audio recovery, and local or cloud transcription.</p><div><a class="project-link" href="https://github.com/EthanChenHyland/clarity">See Clarity <span aria-hidden="true">↗</span></a><span class="project-tech mono">ELECTRON / MACOS / WHISPER.CPP</span></div></div>
-    </section>
-
-    <section class="piano-scene section-pad" id="piano" aria-labelledby="piano-title">
-      <div class="project-metadata mono"><span>03 / SOUND → EVIDENCE</span><span>RUST · MUSIC INFORMATION RETRIEVAL</span></div>
-      <div class="piano-heading"><h2 id="piano-title">What does<br> the music <em>know?</em></h2><div><span class="mono">PIANO MIR</span><p>A score says what should happen.<br> A recording says what did.</p><p>I built a Rust-first prototype to bring the two into alignment.</p></div></div>
-      <div class="full-minuet" aria-label="Complete Minuet score player">
-        <div class="full-minuet-head mono"><span>THE COMPLETE MINUET / 32 MEASURES</span><span>CHRISTIAN PETZOLD · BWV ANH. 114</span></div>
-        <div class="full-minuet-intro"><p>Hear the whole piece.<br><em>Follow every note.</em></p><span class="mono">PLAY · SEEK · SCROLL BACK</span></div>
-        <div class="full-score-shell"><div class="full-score-labels mono" aria-hidden="true"><span>RIGHT<br>HAND</span><span>LEFT<br>HAND</span></div><div class="full-score-window" tabindex="0" role="group" aria-label="Complete Minuet score timeline. Scroll horizontally to seek forward or backward."><div class="full-score-track" aria-hidden="true"></div></div><span class="full-score-cursor" aria-hidden="true"></span></div>
-        <div class="full-minuet-status mono" aria-live="off"><span class="full-minuet-live"><i aria-hidden="true"></i> <span id="full-minuet-bar">BAR 01 / 32</span></span><span id="full-minuet-pitches">G3 · B3 · D5</span><span class="full-minuet-gesture">TAP A NOTE TO JUMP ↗</span></div>
-        <div class="full-minuet-controls"><audio id="full-minuet-audio" preload="metadata" src="/media/minuet-full.mp3"></audio><button class="full-minuet-play mono" type="button" aria-label="Play the complete Minuet">PLAY MINUET ▶</button><label class="full-minuet-scrub mono" for="full-minuet-seek">POSITION <input id="full-minuet-seek" type="range" min="0" max="42.46" step="0.01" value="0" aria-label="Seek through the complete Minuet"><output id="full-minuet-position">00:00 / 00:42</output></label><button class="full-minuet-speed mono" type="button" aria-label="Playback speed: 1 times. Change playback speed">1× SPEED</button></div>
-        <p class="full-minuet-note mono">THE SCORE FOLLOWS THE AUDIO. DRAG, TAP A NOTE, OR SEEK BACK TO REWIND. SYNTHESIZED FROM THE PROJECT’S FULL SOURCE MIDI.</p>
+      <div class="lab__body">
+        <ul class="ledger">
+          <li data-preview="clarity"><a href="https://github.com/EthanChenHyland/clarity"><span class="ledger__name">Clarity</span><span class="ledger__kind">Desktop AI overlay</span></a><p>An open-source overlay for macOS and Windows that turns the screen, the microphone and system audio into transcripts and suggested answers. Bring your own AI provider; local or cloud speech-to-text.</p></li>
+          <li data-preview="wincodex"><a href="https://github.com/EthanChenHyland/WinCodex"><span class="ledger__name">WinCodex</span><span class="ledger__kind">A coding agent for Windows 7</span></a><p>A native .NET 4.8 client snapshots the project, runs the Codex SDK on a remote Linux mirror through an SSH tunnel, streams the work back, and applies changes only after SHA-256 conflict checks. Independent; not an OpenAI product.</p></li>
+          <li data-preview="chess"><a href="https://github.com/EthanChenHyland/FunChessEngine"><span class="ledger__name">FunChessEngine</span><span class="ledger__kind">Chess engine and workstation</span></a><p>An original Python engine with a local, ChessBase-style desktop app for play, analysis, PGN libraries and engine development. The board on the desk replays one of its recorded self-play games.</p></li>
+          <li data-preview="avoid"><a href="https://avoid.love"><span class="ledger__name">avoid.love</span><span class="ledger__kind">An interactive love story</span></a><p>A cinematic, scroll-driven story in 28 chapters about falling in love, trying to avoid it, and failing anyway.</p></li>
+          <li data-preview="wifi"><a href="https://www.wifi-concierge.com/"><span class="ledger__name">Wifi Concierge</span><span class="ledger__kind">Community tech service</span></a><p>The service I founded in Westlake, Ohio: device setup and tech help for more than 70 seniors and families, funded by over $1,500 in services and device resale. I built and run its site.</p></li>
+          <li data-preview="profile"><a href="/github/"><span class="ledger__name">The frog page</span><span class="ledger__kind">A self-updating GitHub profile</span></a><p>An ASCII frog, activity drawings, chess puzzles and project explorations, regenerated by GitHub Actions.</p></li>
+          <li data-preview="text"><a href="https://github.com/EthanChenHyland/nitro-notes"><span class="ledger__name">Nitro Notes</span><span class="ledger__kind">Offline notes and tasks</span></a><p>Fast desktop notes with checklists, search and portable exports.</p></li>
+          <li data-preview="text"><a href="https://github.com/EthanChenHyland/kitcoscraper"><span class="ledger__name">Kitco scraper</span><span class="ledger__kind">Price collection for Carat Coin</span></a><p>Node.js and Puppeteer automation that collects precious-metals prices on a schedule and writes CSV reports.</p></li>
+          <li data-preview="text"><a href="https://github.com/EthanChenHyland/chatgpt-web"><span class="ledger__name">Desktop wrappers</span><span class="ledger__kind">Electron shells for the web</span></a><p>Unofficial macOS apps for ChatGPT, Outlook and Grok with native window controls.</p></li>
+        </ul>
+        <div class="preview" aria-hidden="true">
+          <figure data-for="clarity"><img src="/media/clarity-overlay.png" width="1328" height="870" alt="" loading="lazy"><figcaption>Clarity’s overlay over a call: transcript on one side, a suggested answer on the other.</figcaption></figure>
+          <figure data-for="wincodex">
+            <svg viewBox="0 0 440 280" role="presentation">
+              <rect x="10" y="60" width="160" height="150" fill="#16181b"/>
+              <rect x="270" y="60" width="160" height="150" fill="#16181b"/>
+              <text x="26" y="96" class="svg-h">Windows 7</text><text x="26" y="122" class="svg-t">WinCodex.exe</text><text x="26" y="144" class="svg-t">.NET 4.8 client</text><text x="26" y="166" class="svg-t">snapshot · apply</text><text x="26" y="188" class="svg-t">conflict checks</text>
+              <text x="286" y="96" class="svg-h">Linux</text><text x="286" y="122" class="svg-t">FastAPI + Codex</text><text x="286" y="144" class="svg-t">persistent threads</text><text x="286" y="166" class="svg-t">sandboxed mirror</text><text x="286" y="188" class="svg-t">streamed events</text>
+              <path d="M176 118h88" class="svg-flow"/><path d="M264 152h-88" class="svg-flow svg-flow--back"/>
+              <text x="190" y="108" class="svg-t">ZIP snapshot</text><text x="196" y="174" class="svg-t">changes</text>
+              <text x="178" y="246" class="svg-t">over an SSH tunnel</text>
+            </svg>
+            <figcaption>The bridge: Windows stays the source of truth.</figcaption>
+          </figure>
+          <figure data-for="chess"><div class="mini-board" id="mini-board"></div><figcaption id="mini-board-caption">FunChessEngine self-play, recorded with a 180 ms search budget per move.</figcaption></figure>
+          <figure data-for="avoid"><img src="/media/shots/avoid-love.jpg" width="800" height="500" alt="" loading="lazy"><figcaption>The opening of avoid.love.</figcaption></figure>
+          <figure data-for="wifi"><img src="/media/shots/wifi-concierge.jpg" width="800" height="500" alt="" loading="lazy"><figcaption>wifi-concierge.com: bridging the digital divide, one client at a time.</figcaption></figure>
+          <figure data-for="profile"><img src="/media/frog.svg" width="620" height="419" alt="" loading="lazy" class="preview__frog"><figcaption>The frog, drawn in ASCII by the profile’s own workflow.</figcaption></figure>
+          <figure data-for="text"><p class="preview__text">Small, useful, finished. Open any of them on GitHub.</p></figure>
+        </div>
       </div>
-      <p class="excerpt-heading mono">PIANO MIR CAPTURE / FIRST 12.3 SECONDS</p>
-      <div class="piano-instrument"><div class="instrument-top mono"><span>CAPTURED EXCERPT / MIDI &amp; AUDIO CHROMA</span><span>SCORE ↔ AUDIO</span></div><div class="score-visual" role="img" aria-label="Expected notes from a 12-second synthesized Minuet score excerpt, followed by 0.3 seconds of audio decay."><div class="score-label mono">EXPECTED <br> NOTES</div><svg id="score-chart" viewBox="0 0 1100 160" preserveAspectRatio="none" aria-hidden="true"><path d="M0 8H1100" stroke="#c4e6b7" stroke-opacity=".12"/><path d="M0 34H1100" stroke="#c4e6b7" stroke-opacity=".12"/><path d="M0 60H1100" stroke="#c4e6b7" stroke-opacity=".12"/><path d="M0 86H1100" stroke="#c4e6b7" stroke-opacity=".12"/><path d="M0 112H1100" stroke="#c4e6b7" stroke-opacity=".12"/><path d="M0 138H1100" stroke="#c4e6b7" stroke-opacity=".12"/><rect x="0.00" y="40.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="35.77" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="53.66" y="60.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="71.54" y="52.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="89.13" y="48.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="107.02" y="40.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="143.39" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="178.56" y="68.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="214.34" y="32.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="250.41" y="48.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="267.99" y="40.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="285.88" y="32.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="303.77" y="24.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="321.95" y="20.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="357.72" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="393.20" y="68.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="429.27" y="48.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="465.04" y="40.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="482.93" y="48.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="500.51" y="52.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="518.40" y="60.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="536.88" y="52.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="572.36" y="48.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="590.24" y="52.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="608.13" y="60.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="626.02" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="643.90" y="72.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="679.38" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="697.26" y="60.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="715.45" y="52.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="733.33" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="751.82" y="52.00" width="6.86" height="4" rx="1" fill="#c4e6b7"/><rect x="756.59" y="48.00" width="5.96" height="4" rx="1" fill="#c4e6b7"/><rect x="763.44" y="52.00" width="5.96" height="4" rx="1" fill="#c4e6b7"/><rect x="768.51" y="48.00" width="5.96" height="4" rx="1" fill="#c4e6b7"/><rect x="777.75" y="52.00" width="5.96" height="4" rx="1" fill="#c4e6b7"/><rect x="786.99" y="60.00" width="71.54" height="4" rx="1" fill="#c4e6b7"/><rect x="858.54" y="40.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="894.61" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="911.90" y="60.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="930.38" y="52.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="948.27" y="48.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="966.15" y="40.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="1001.92" y="68.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="1037.40" y="68.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="1072.87" y="32.00" width="0.30" height="4" rx="1" fill="#c4e6b7"/><rect x="0.00" y="116.00" width="71.54" height="4" rx="1" fill="#c4e6b7"/><rect x="0.00" y="100.00" width="71.54" height="4" rx="1" fill="#c4e6b7"/><rect x="0.00" y="88.00" width="71.54" height="4" rx="1" fill="#c4e6b7"/><rect x="70.95" y="108.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="106.72" y="100.00" width="107.32" height="4" rx="1" fill="#c4e6b7"/><rect x="214.04" y="96.00" width="107.32" height="4" rx="1" fill="#c4e6b7"/><rect x="320.76" y="100.00" width="107.32" height="4" rx="1" fill="#c4e6b7"/><rect x="428.67" y="108.00" width="107.32" height="4" rx="1" fill="#c4e6b7"/><rect x="536.29" y="116.00" width="107.32" height="4" rx="1" fill="#c4e6b7"/><rect x="643.90" y="88.00" width="8.94" height="4" rx="1" fill="#c4e6b7"/><rect x="679.38" y="100.00" width="8.94" height="4" rx="1" fill="#c4e6b7"/><rect x="715.15" y="116.00" width="8.94" height="4" rx="1" fill="#c4e6b7"/><rect x="750.62" y="88.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="786.69" y="136.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="804.88" y="96.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="822.47" y="100.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="840.35" y="108.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="858.54" y="100.00" width="71.54" height="4" rx="1" fill="#c4e6b7"/><rect x="929.49" y="108.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="965.26" y="116.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="1001.33" y="100.00" width="17.89" height="4" rx="1" fill="#c4e6b7"/><rect x="1036.80" y="116.00" width="35.77" height="4" rx="1" fill="#c4e6b7"/><rect x="1072.57" y="96.00" width="0.60" height="4" rx="1" fill="#c4e6b7"/></svg></div><div class="chroma-visual" role="img" aria-label="Captured audio pitch-class strengths, max-pooled into 75-millisecond windows. Brighter marks indicate stronger captured values."><div class="score-label mono">DETECTED <br> CHROMA</div><img src="/media/chroma.svg" width="1100" height="160" alt="" loading="lazy"/><div class="playhead" aria-hidden="true"></div></div><div class="instrument-axis mono" aria-label="Time in seconds"><span style="--tick:0.000000%">0 SEC</span><span style="--tick:32.520325%">4</span><span style="--tick:65.040650%">8</span><span style="--tick:100.000000%">12.3 SEC</span></div><div class="audio-row"><audio controls preload="none" id="minuet-audio" aria-label="Play synthesized Minuet excerpt" src="/media/minuet.wav"></audio><span class="mono" id="audio-status">SYNTHESIZED AUDIO · 12.3 SEC</span></div></div>
-      <div class="piano-details"><p><strong>Known score. Real analysis.</strong> Captured analysis of synthesized audio checks agreement with a known score; the report describes score-aligned verification, not a performance grade.</p><div><a class="project-link" href="https://github.com/EthanChenHyland/PianoMirRustPublic">Inside Piano MIR <span aria-hidden="true">↗</span></a><a class="quiet-link mono" href="/data/piano-report.md" download>READ THE CAPTURE REPORT ↓</a><a class="quiet-link mono" href="/data/piano-provenance.json">CAPTURE PROVENANCE ↗</a></div></div>
     </section>
 
-    <section class="avoid-scene section-pad" id="avoid" aria-labelledby="avoid-title">
-      <div class="project-metadata mono"><span>04 / INTERACTION → FEELING</span><span>CREATIVE WEB · 28 CHAPTERS</span></div>
-      <div class="avoid-heading"><span class="mono">AND SOMETIMES,<br> THE INPUT IS A FEELING.</span><h2 id="avoid-title">Not everything<br> needs <em>a score.</em></h2></div>
-      <a class="avoid-art" href="https://avoid.love" aria-label="Visit avoid.love, Ethan’s interactive story"><img src="/media/avoid-love.jpg" alt="avoid.love project artwork: a scarlet poppy against the evening sky." width="1200" height="630" loading="lazy" decoding="async"/><span class="art-launch">Enter the story <span aria-hidden="true">↗</span></span><span class="art-corner mono" aria-hidden="true">A DIFFERENT KIND OF SYSTEM.</span></a>
-      <div class="avoid-caption"><h3>avoid.love</h3><p>A story told through scroll, physical objects, and continuous scenes. An experiment in making a browser feel like something you can hold.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/avoid.love">HOW IT’S MADE ↗</a></div>
-    </section>
-
-    <section class="experiments section-pad" id="experiments" aria-labelledby="experiments-title">
-      <div class="section-rule mono"><span>THE SIDE CHANNELS</span><span>STILL FOLLOWING THE QUESTION</span></div>
-      <div class="experiment-intro"><h2 id="experiments-title">Meanwhile,<br> <em>in the lab.</em></h2><p>Some useful things.<br> Some unreasonable constraints.<br> A few ideas that got out of hand.</p></div>
-      <div class="experiment-index">
-        <details><summary><span class="experiment-number mono">01</span><h3>WinCodex</h3><span class="experiment-type mono">OLD MACHINE. NEW TOOLS.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>A Windows 7 client bridges to a modern coding agent on Linux. Snapshots go out; changes return only after conflict checks. An independent project, not an official OpenAI product.</p><div class="bridge-diagram mono" aria-label="Windows 7 local source to Linux remote mirror, with conflict-checked changes returning"><span>WINDOWS 7<br> <small>LOCAL SOURCE</small></span><span aria-hidden="true">⇄</span><span>LINUX<br> <small>REMOTE MIRROR</small></span></div><a class="quiet-link mono" href="https://github.com/EthanChenHyland/WinCodex">EXPLORE WINCODEX ↗</a></div></details>
-        <details><summary><span class="experiment-number mono">02</span><h3>FunChessEngine</h3><span class="experiment-type mono">ONE MORE MOVE.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>An original classical chess engine that grew into a local workstation: move search, evaluation, PGN libraries, analysis, tournaments, and engine testing.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/FunChessEngine">EXPLORE THE ENGINE LAB ↗</a><a class="quiet-link mono" href="/github/">WATCH THE RECORDED SELF-PLAY ↗</a></div></details>
-        <details><summary><span class="experiment-number mono">03</span><h3>TowerLogic</h3><span class="experiment-type mono">PIXELS BECOME A POSITION.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>An experimental game-state pipeline: screenshot → computer vision → normalized state → policy decision. PyTorch, ONNX, template matching, and emulator control. Independent research, not an official Supercell project.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/TowerLogic">EXPLORE TOWERLOGIC ↗</a></div></details>
-        <details><summary><span class="experiment-number mono">04</span><h3>Mosaic</h3><span class="experiment-type mono">MAKE THE WHOLE THING WORK.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>An image discovery and collection product with privacy, collaboration, and a freeform Canvas. Built for the Change++ challenge. I chose a cohesive save → organize → share flow over adding technology just to lengthen the stack.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/Fall2026-CodingChallenge">EXPLORE MOSAIC ↗</a></div></details>
-        <details><summary><span class="experiment-number mono">05</span><h3>Kitco Scraper</h3><span class="experiment-type mono">LESS COPYING. MORE DOING.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>Precious-metals pricing collected on a schedule and exported to CSV. Built for Carat Coin to replace repetitive manual price tracking with a reusable reporting workflow.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/kitcoscraper">EXPLORE THE SCRAPER ↗</a></div></details>
-        <details><summary><span class="experiment-number mono">06</span><h3>Nitro Notes</h3><span class="experiment-type mono">CAPTURE IT. KEEP IT LOCAL.</span><span class="expand-symbol" aria-hidden="true">+</span></summary><div class="experiment-body"><p>An offline desktop notebook with synchronized notes and tasks, search, and portable exports. No account or cloud service required.</p><a class="quiet-link mono" href="https://github.com/EthanChenHyland/nitro-notes">EXPLORE NITRO NOTES ↗</a></div></details>
+    <section class="experience" id="experience" aria-labelledby="experience-title">
+      <h2 id="experience-title">Experience</h2>
+      <ol class="roles">
+        <li><p class="roles__when">Sep 2026 – now</p><h3>Change++, City Settlers</h3><p class="roles__what">Main developer, for Nashville’s Civic Design Center</p><p>Re-architected a multiplayer civic-engagement game into an idle city builder; 13.9K lines across 78 files, 70 tests, server load-tested with 30 simulated students.</p></li>
+        <li><p class="roles__when">Sep 2026 – now</p><h3>Lawly</h3><p class="roles__what">Full-stack software engineering intern, remote</p><p>Built Lawly’s first Playwright end-to-end regression framework, automating six authentication and session behaviours with contract validation against the production sign-in handler.</p></li>
+        <li><p class="roles__when">Sep 2026 – now</p><h3>Alterea, Inc. — Agents of Influence</h3><p class="roles__what">Web development intern, remote</p><p>Investigated six React and TypeScript dashboard issues and opened five bug-fix pull requests across onboarding, classroom routing, CSV import, pathway UI and student selection, validated against 493 passing tests.</p></li>
+        <li><p class="roles__when">Sep 2024 – now</p><h3>Wifi Concierge</h3><p class="roles__what">Founder and web developer, Westlake, Ohio</p><p>Founded a community technology service for 70+ seniors and underserved families; raised $1,500+ through technical services and device resale.</p></li>
+        <li><p class="roles__when">Jun – Aug 2025</p><h3>Cleveland Clinic</h3><p class="roles__what">NextGen Radiology Department intern</p><p>Worked with clinical AI, machine learning, image processing and medical imaging under Po-Hao Chen, MD, MBA, Vice Chair of AI, Diagnostics Institute.</p></li>
+        <li><p class="roles__when">Jun – Aug 2024</p><h3>Hyland Software</h3><p class="roles__what">Research and development intern, Westlake, Ohio</p><p>Redesigned the Hy-Tech Club website to centralise resources for three course tracks: student forms, virtual-session links and learning materials in one place.</p></li>
+      </ol>
+      <div class="education">
+        <h3>Vanderbilt University</h3>
+        <p>B.S. in Computer Science, second major in Human &amp; Organizational Development. Expected May 2030.</p>
+        <p>National Merit Finalist. Presidential Scholar Semifinalist.</p>
+        <a class="btn btn--line" href="/resume.pdf">Download the resume (PDF)</a>
       </div>
-      <a class="all-repos mono" href="https://github.com/EthanChenHyland?tab=repositories">MORE AT THE SOURCE <span aria-hidden="true">↗</span></a>
     </section>
 
-    <section class="about-scene section-pad" id="about" aria-labelledby="about-title">
-      <div class="section-rule mono"><span>02 — THE PERSON AT THE OTHER END</span><span>BEYOND THE REPOSITORY</span></div>
-      <div class="about-layout"><h2 id="about-title">Curiosity is<br> the <em>constant.</em></h2><div class="about-copy"><p>I’m Ethan, a Vanderbilt undergraduate in Nashville. I’m interested in intelligence—how we build it, how we test it, and where it can actually help.</p><p>That leads me toward AI and healthcare, computer vision, music, and the occasional very old computer. I tend to keep going after the original question is answered.</p><p>Outside software: piano, chess, and clarinet.</p><div class="context-spine">
-  <div>
-    <span class="mono">EXPECTED MAY 2030</span>
-    <p>Vanderbilt University, School of Engineering<br> <small>B.E. in Computer Science, Minor in Data Science</small></p>
-  </div>
-  <div>
-    <span class="mono">2024-Present</span>
-    <p>Wifi Concierge · Founder &amp; Web Developer<br> <small>Founded a community technology initiative serving 70+ individuals and families; built and maintained its website.</small></p>
-  </div>
-  <div>
-    <span class="mono">Summer 2025</span>
-    <p>Cleveland Clinic · Radiology Department Intern<br> <small>Worked in an AI-focused radiology environment with exposure to machine learning, image processing, and healthcare AI.</small></p>
-  </div>
-  <div>
-    <span class="mono">Summer 2025</span>
-    <p>PCs for People · Technology Department Intern<br> <small>Reconditioned and configured computers for affordable resale to underserved families.</small></p>
-  </div>
-  <div>
-    <span class="mono">Summer 2024</span>
-    <p>Hyland Software · R&amp;D Intern<br> <small>Evaluated Hy-Tech Club course content and redesigned the program homepage.</small></p>
-  </div>
-</div></div></div>
-      <div class="human-note"><span class="mono">A NOTE TO SELF</span><p>Follow the interesting part.<br> <em>Then make it work.</em></p><span class="note-registration" aria-hidden="true">+</span></div>
+    <section class="about" id="about" aria-labelledby="about-title">
+      <h2 id="about-title" class="about__title">About</h2>
+      <div class="about__grid">
+        <dl class="about__facts">
+          <div><dt>Based in</dt><dd>Nashville, Tennessee</dd></div>
+          <div><dt>Studying</dt><dd>Computer Science and HOD at Vanderbilt</dd></div>
+          <div><dt>Away from the desk</dt><dd>Chess, piano, music production, games</dd></div>
+        </dl>
+        <div><p class="about__text">Computer science and Human &amp; Organizational Development: systems, and the people who have to use them.</p><p class="about__more">Most of what I build starts as a question I can’t leave alone. Can software hear a wrong note? Can it read a game from pixels? Can a city budget make sense to a classroom?</p></div>
+      </div>
+      <div class="about__photos" id="photos" hidden></div>
+      <div class="about__record">
+        <div>
+          <h3>Builds with</h3>
+          <ul><li>Python, TypeScript, JavaScript, Java, Rust, SQL</li><li>React, Next.js, Node.js, Express, Socket.IO</li><li>three.js and React Three Fiber</li><li>PostgreSQL, Supabase, SQLite</li><li>PyTorch, OpenCV, ONNX Runtime</li><li>Vitest, Playwright, Docker, GitHub Actions</li></ul>
+        </div>
+        <figure class="about__frog"><img src="/media/frog.svg" width="620" height="419" alt="A frog drawn in ASCII characters, facing right." loading="lazy"><figcaption>The frog. It is on the desk too.</figcaption></figure>
+      </div>
     </section>
 
+    <section class="contact" id="contact" data-focus="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Get in touch</h2>
+      <p>Internships, collaborations, or a project you think I’d like.</p>
+      <ul class="contact__links">
+        <li><a href="mailto:ethan.b.chen@vanderbilt.edu">ethan.b.chen@vanderbilt.edu</a><button type="button" class="copy" data-copy="ethan.b.chen@vanderbilt.edu">Copy</button></li>
+        <li><a href="https://github.com/EthanChenHyland">GitHub</a></li>
+        <li><a href="https://www.linkedin.com/in/ethanbchen/">LinkedIn</a></li>
+        <li><a href="/resume.pdf">Resume (PDF)</a></li>
+      </ul>
+    </section>
   </main>
 
-    <footer class="contact-scene section-pad" id="contact" aria-labelledby="contact-title">
-      <div class="section-rule mono"><span>03 — END OF TRACE</span><span>NOT THE END OF THE WORK</span></div>
-      <svg class="closing-trace" viewBox="0 0 1000 180" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 C200 0 240 90 500 90 H1000"/><path d="M0 90 H1000"/><path d="M0 180 C200 180 240 90 500 90 H1000"/><circle cx="995" cy="90" r="4"/></svg>
-      <h2 id="contact-title">Still<br> <em>building.</em></h2>
-      <div class="contact-bottom"><p>Have a strange problem?<br> That’s a good place to start.</p><div class="contact-links"><a href="mailto:ethan.b.chen@vanderbilt.edu">Email <span aria-hidden="true">↗</span></a>
-<a href="https://www.linkedin.com/in/ethanbchen/">LinkedIn <span aria-hidden="true">↗</span></a>
-<a href="/resume.pdf" download>Resume <span aria-hidden="true">↓</span></a><a href="https://github.com/EthanChenHyland">GitHub <span aria-hidden="true">↗</span></a><a href="/github/">Enter the Pond <span aria-hidden="true">↗</span></a></div></div>
-      <div class="footer-baseline mono"><span>ETHAN B. CHEN © 2026</span><a href="#top">BACK TO THE BEGINNING ↑</a><a class="frog-signature" href="/github/" aria-label="A small frog lives in the Pond. Visit the Pond."><img src="/media/frog.svg" width="620" height="419" alt=""/><span class="frog-endpoint" aria-hidden="true"></span></a></div>
-    </footer>
-  <noscript><style>.schema-controls,.schema-instruction,.channel-controls,.disturb-identity{display:none}.playhead,#audio-status{display:none}</style></noscript>
+  <footer class="foot">
+    <p class="foot__name" aria-hidden="true">Ethan B. Chen</p>
+    <p class="credits">Pictures in Mosaic’s board, via Wikimedia Commons: <a href="https://commons.wikimedia.org/wiki/File:Nashville_Skyline_at_Night_I-65.jpeg">Nashville Skyline at Night I-65</a> by Cessna86, public domain; <a href="https://commons.wikimedia.org/wiki/File:Nashville_skyline_2009.jpg">Nashville skyline 2009</a> by Kaldari, public domain; <a href="https://commons.wikimedia.org/wiki/File:Parthenon_in_Nashville_2025.jpg">Parthenon in Nashville 2025</a> by BullDawg2021, <a href="https://creativecommons.org/licenses/by/4.0">CC BY 4.0</a>; <a href="https://commons.wikimedia.org/wiki/File:Tennessee_State_Capitol_2009.jpg">Tennessee State Capitol 2009</a> by Kaldari, public domain; <a href="https://commons.wikimedia.org/wiki/File:Kirkland_Hall_at_Vanderbilt_University.jpg">Kirkland Hall at Vanderbilt University</a> by Jaydenwithay, <a href="https://creativecommons.org/licenses/by/4.0">CC BY 4.0</a>; <a href="https://commons.wikimedia.org/wiki/File:Rymanauditorium1.jpg">Ryman Auditorium</a>, CC0. Camera and quality systems adapted from <a href="https://github.com/TheOrcDev/4elements">4elements</a> (MIT). Type: Switzer and IBM Plex Mono.</p>
+    <p class="foot__end">© 2026 Ethan B. Chen. Built in Nashville.</p>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
