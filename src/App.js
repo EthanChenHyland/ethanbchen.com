@@ -40,21 +40,40 @@ const RECOMPOSE = {
   deadZone: 0.15,
   elevRate: THREE.MathUtils.degToRad(2), // per second, at most
   radiusRate: 0.045, // log-distance per second, at most
-  breathElev: THREE.MathUtils.degToRad(1.5),
-  breathRadius: 0.018, // ±1.8% of the distance
+  // the idle orbit's slow cinematic breathing: about ±3.5° of elevation and ±6% of distance around
+  // wherever the view sits, never above the trigger or below 9°
+  breathElev: THREE.MathUtils.degToRad(3.5),
+  breathRadius: 0.06,
+  floor: THREE.MathUtils.degToRad(9),
 };
 
 // The same recomposition while a station is focused, around its own settled focus view: a camera
 // left more than `trigger` above it, or well outside the dead zone in distance, drifts back to it.
-// No breathing (the focus orbit is its own motion). Only stations listed here take part.
 // Resume: about 20° up, the standing page stops reading as a page. Projects (the console): the
 // screen tilts back and stays readable to about 30° absolute, after which the brow covers it; its
 // focus view is closer, and it reads well down to ~0.8× that distance, so its dead zone is a little
-// wider. Experience (still the Water placeholder) and Profile keep the original focus behaviour.
+// wider. Profile and Experience (still placeholders) use a generic 22° limit.
+// Every focused station breathes once its focus orbit runs. Resume only a little (its paper life
+// reads the camera's own displacement, which this barely adds to); Profile and Experience are still
+// placeholders and get a conservative generic breath.
+const D = THREE.MathUtils.degToRad;
 const FOCUS_RECOMPOSE = {
-  resume: { trigger: THREE.MathUtils.degToRad(20) },
-  projects: { trigger: THREE.MathUtils.degToRad(24), deadZone: 0.2 },
+  resume: { trigger: D(20), breathElev: D(0.8), breathRadius: 0.022, floor: D(2.5) },
+  profile: { trigger: D(22), deadZone: 0.18, breathElev: D(1.8), breathRadius: 0.045, floor: D(2.5) },
+  experience: { trigger: D(22), deadZone: 0.18, breathElev: D(1.8), breathRadius: 0.045, floor: D(2.5) },
+  // the console's focus orbit (radius ~10.4) would pass through Resume's page (8.5 away, at -90°
+  // round the console) and Experience (180°): its idle orbit keeps to the arc between them, easing
+  // to a stop and turning back at either end (azimuth round the station, from +z toward +x)
+  projects: { trigger: D(24), deadZone: 0.2, breathElev: D(2.2), breathRadius: 0.05, floor: D(2), orbitWindow: [D(-62), D(150)] },
 };
+
+// The idle orbit's own pace varies slowly (two long periods), so the exhibition camera lingers and
+// moves on rather than turning like a turntable; Resume's focused orbit varies least.
+function orbitPace(time, focused) {
+  const base = focused ? 0.5 : 0.28;
+  const depth = focused === 'resume' ? 0.12 : 0.3;
+  return base * (1 + depth * (0.65 * Math.sin((time * Math.PI * 2) / 67) + 0.35 * Math.sin((time * Math.PI * 2) / 103 + 1.7)));
+}
 
 export class App {
   constructor(canvas, { onProgress } = {}) {
@@ -231,6 +250,46 @@ export class App {
     this.uniforms.uPointScale.value = (h * this.dpr) / (2 * Math.tan(fovRad / 2));
   }
 
+  /**
+   * A focused station whose idle orbit must keep to an arc (see FOCUS_RECOMPOSE): returns the orbit's
+   * signed pace factor, which eases through zero to turn back at either end of the arc, and heads
+   * back into it if the user has left the view outside. Manual control is never constrained.
+   */
+  #orbitWindow(c, dt) {
+    const win = FOCUS_RECOMPOSE[this.focused]?.orbitWindow;
+    const o = (this._orbitW ??= { dir: 1, k: 1, sign: -1, az: null, id: null, dwell: 0 });
+    if (o.id !== this.focused) Object.assign(o, { dir: 0, k: 1, az: null, id: this.focused, dwell: 0 });
+    if (!win || !c.autoRotate || this.rig.busy) {
+      o.az = null;
+      return win ? o.k : 1;
+    }
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    const off = (this._owOff ??= new THREE.Vector3());
+    off.subVectors(this.camera.position, c.target);
+    const az = Math.atan2(off.x, off.z);
+    const vel = o.az === null ? 0 : wrap(az - o.az);
+    o.az = az;
+    // learn which way a positive pace turns the azimuth
+    if (Math.abs(vel) > 1e-5 && Math.abs(o.k) > 0.2) o.sign = Math.sign(vel) * Math.sign(o.k);
+    const mid = (win[0] + win[1]) / 2, half = (win[1] - win[0]) / 2;
+    const rel = wrap(az - mid);
+    // direction of travel in azimuth: kept, or (first time, or left outside the arc) toward its middle
+    if (o.dir === 0) o.dir = Math.abs(rel) > half - 0.05 ? -Math.sign(rel) : Math.sign(vel) || o.sign;
+    if (Math.abs(rel) > half) o.dir = -Math.sign(rel);
+    // how much arc is left ahead: the pace eases out over the last ~28° (a long soft deceleration),
+    // rests almost still at the apex for about a second, then accelerates away the other way
+    const ahead = o.dir > 0 ? half - rel : half + rel;
+    const D = THREE.MathUtils.degToRad;
+    const ease = THREE.MathUtils.smoothstep(ahead, D(1.5), D(28));
+    if (ahead < D(3) && Math.abs(o.k) < 0.06) {
+      o.dwell += dt;
+      if (o.dwell > 1.1) (o.dir = -o.dir), (o.dwell = 0);
+    } else o.dwell = 0;
+    const want = o.dir * o.sign * ease;
+    o.k += (want - o.k) * Math.min(1, dt * 1.1);
+    return o.k;
+  }
+
   /** Recomposition settings for a focused station, referenced to its own settled focus view. */
   #focusRecompose(id) {
     this._focusRecomp ??= {};
@@ -239,7 +298,7 @@ export class App {
       const radius = v.pos.distanceTo(v.target);
       const elevation = Math.asin((v.pos.y - v.target.y) / radius);
       const own = FOCUS_RECOMPOSE[id];
-      return { ...RECOMPOSE, deadZone: own.deadZone ?? RECOMPOSE.deadZone, elevation, radius, trigger: elevation + own.trigger, breathElev: 0, breathRadius: 0 };
+      return { ...RECOMPOSE, deadZone: own.deadZone ?? RECOMPOSE.deadZone, elevation, radius, trigger: elevation + own.trigger, breathElev: own.breathElev ?? 0, breathRadius: own.breathRadius ?? 0, floor: own.floor ?? 0.05 };
     })());
   }
 
@@ -304,7 +363,7 @@ export class App {
     const c = this.rig.controls;
     if (this.autoOrbit && this.idle > 7 && !this.rig.busy && !c.autoRotate) c.autoRotate = true;
     if (!this.autoOrbit) c.autoRotate = false;
-    c.autoRotateSpeed = this.focused ? 0.5 : 0.28;
+    c.autoRotateSpeed = orbitPace(this.time, this.focused) * this.#orbitWindow(c, dt);
     // a camera left looking almost straight down spirals back to a readable height, but only while
     // the idle overview orbit runs (any input stops auto-rotate, and with it this)
     if (c.autoRotate && !this.focused && !this.rig.busy && !this.introActive) this.rig.recompose(dt, RECOMPOSE);

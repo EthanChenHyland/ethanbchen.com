@@ -80,10 +80,11 @@ export class CameraRig {
    *  - A view higher than `trigger` drifts down to `elevation`, and a distance well outside a dead
    *    zone around `radius` drifts back to it. Each correction latches when it starts and runs to
    *    its goal; both are rate-limited (about the orbit's own pace) and slow near the goal.
-   *  - Once nothing is correcting, a very slow breathing in elevation and distance fades in around
-   *    wherever the camera sits (two unrelated slow periods each, so it never reads as a loop).
+   *  - Once nothing is correcting, a slow cinematic breathing in elevation and distance fades in
+   *    around wherever the camera sits (three unrelated slow periods each, so it never reads as a
+   *    loop), kept between `floor` and the overhead trigger. Any input ends it on the spot.
    */
-  recompose(dt, { trigger, elevation, radius, deadZone, elevRate, radiusRate, breathElev, breathRadius }) {
+  recompose(dt, { trigger, elevation, radius, deadZone, elevRate, radiusRate, breathElev, breathRadius, floor = 0.05 }) {
     const r = (this._recomp ??= { elev: false, dist: false, ve: 0, vr: 0, w: 0, t: this._breathT ?? 0, be: 0, br: 0 });
     const c = this.controls;
     this._off ??= new THREE.Vector3();
@@ -111,11 +112,14 @@ export class CameraRig {
     r.t += dt;
     this._breathT = r.t;
     const tau = Math.PI * 2;
-    const be = r.w * breathElev * (0.65 * Math.sin((tau * r.t) / 27) + 0.35 * Math.sin((tau * r.t) / 41 + 1.3));
-    const br = r.w * breathRadius * (0.6 * Math.sin((tau * r.t) / 33 + 2.0) + 0.4 * Math.sin((tau * r.t) / 52 + 0.4));
-    // breathing never lifts the view toward the overhead trigger
-    const headroom = trigger - 0.01 - (Math.PI / 2 - sp.phi);
-    sp.phi -= Math.min(be - r.be, Math.max(headroom, 0));
+    // three unrelated slow periods each (27–89 s), so the drift never reads as a loop
+    const sn = (p, ph) => Math.sin((tau * r.t) / p + ph);
+    const be = r.w * breathElev * (0.5 * sn(31, 0) + 0.3 * sn(47, 1.3) + 0.2 * sn(73, 2.1));
+    const br = r.w * breathRadius * (0.5 * sn(37, 2.0) + 0.3 * sn(59, 0.4) + 0.2 * sn(89, 1.1));
+    // breathing never lifts the view toward the overhead trigger, nor drops it below `floor`
+    const elevB = Math.PI / 2 - sp.phi;
+    const headroom = trigger - 0.01 - elevB;
+    sp.phi -= THREE.MathUtils.clamp(be - r.be, Math.min(floor - elevB, 0), Math.max(headroom, 0));
     sp.radius *= Math.exp(br - r.br);
     r.be = be;
     r.br = br;

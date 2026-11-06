@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ResumeSound } from './ResumeSound.js';
+import { ProjectsSound } from './ProjectsSound.js';
 
 /**
  * Fully procedural ambience (no audio files): the self-writing
@@ -129,7 +130,8 @@ export class Soundscape {
     // ---- resume: stylus on paper and the paper around it ----
     this.resume = new ResumeSound(ctx, this.bus.resume, { white: this.white, pink, brown }, this.master);
 
-    // ---- projects (the console): silent until its own voice exists; Air's wind went with the vortex ----
+    // ---- projects: the console's own voice (see ProjectsSound; first pass, not yet mixed by ear) ----
+    this.projects = new ProjectsSound(ctx, this.bus.projects, { white: this.white, pink, brown });
 
     // ---- experience, still the water placeholder: babbling band-pass + scheduled droplet "bloops" ----
     this.babble = this.#filter('bandpass', 700, 3.5);
@@ -199,6 +201,7 @@ export class Soundscape {
     for (const el of elements) {
       const id = el.def.id;
       if (id === 'resume') this.resume.update(el, camera, this._right);
+      if (id === 'projects') this.projects.update(el);
       el.group.getWorldPosition(this._v);
       this._v.y += 2.2;
       const d = this._v.distanceTo(camera.position);

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { patchMaterial } from '../gl/patch.js';
-import { hashGLSL, worldPosVaryingVertex } from '../gl/glsl.js';
+import { worldPosVaryingVertex } from '../gl/glsl.js';
 import { mulberry32 } from '../gl/noise.js';
 
 // The Projects screen is a boundary between the station and a digital space far deeper than the
@@ -57,6 +58,24 @@ bool scrSee(vec3 wp, out float depth) {
 }
 // the far end of the digital space
 float scrFar(float s) { return 1.0 - smoothstep(${STAGE.fadeA.toFixed(2)}, ${STAGE.fadeB.toFixed(2)}, s); }
+`;
+
+/**
+ * For things that move freely between the interior and the station (holograms, wires, beads): a
+ * point is inside the computer only if it is behind the glass and within the glass's outline (the
+ * glass plane itself runs on past the screen); only those points are drawn through the glass.
+ * Returns false if the fragment must be discarded; `fd` is the depth to write, `s` the distance past
+ * the glass (negative in front).
+ */
+export const BOUND_GLSL = /* glsl */ `
+bool scrBound(vec3 w, out float fd, out float s) {
+  fd = gl_FragCoord.z;
+  vec3 sl = (uScrInv * vec4(w, 1.0)).xyz;
+  s = -sl.z;
+  bool inside = sl.z < 0.0 && sl.z > -9.0 && abs(sl.x) < uScrHalf.x + 0.15 && abs(sl.y) < uScrHalf.y + 0.15;
+  if (!inside) { s = min(s, 0.0); return true; }
+  return scrSee(w, fd);
+}
 `;
 
 const PH = `vec3(${PHOSPHOR.toArray().map((v) => v.toFixed(3)).join(', ')})`;
@@ -150,150 +169,142 @@ function interiorRoom(scr, depth) {
   return mesh;
 }
 
-/** A software window frame floating in the digital space; the front one holds code and a caret. */
-function interiorWindow(scr, uTime, { w, h, code = 0, glow = 1 }) {
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { ...scr, uTime, uSize: { value: new THREE.Vector2(w, h) }, uCode: { value: code }, uGlow: { value: glow } },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    vertexShader: /* glsl */ `
-      varying vec3 vW;
-      varying vec2 vUv;
-      void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vW = wp.xyz; vUv = uv;
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }`,
-    fragmentShader: /* glsl */ `
-      ${SCREEN_GLSL}
-      ${hashGLSL}
-      uniform float uTime;
-      uniform vec2 uSize;
-      uniform float uCode;
-      uniform float uGlow;
-      varying vec3 vW;
-      varying vec2 vUv;
-      float box(vec2 p, vec2 lo, vec2 hi) {
-        vec2 aa = fwidth(p) * 0.75;
-        vec2 a = smoothstep(lo - aa, lo + aa, p) * (1.0 - smoothstep(hi - aa, hi + aa, p));
-        return a.x * a.y;
-      }
-      void main() {
-        float fd;
-        if (!scrSee(vW, fd)) discard;
-        gl_FragDepth = fd;
-        vec2 p = vUv * uSize;
-        vec2 d = min(p, uSize - p);
-        float t = 0.012;
-        vec2 aa = fwidth(p);
-        float frame = 1.0 - smoothstep(t, t + aa.x * 1.5, min(d.x, d.y));
-        float bar = 0.085;
-        float title = box(p, vec2(0.0, uSize.y - bar), uSize);
-        float rule = box(p, vec2(0.0, uSize.y - bar - t), vec2(uSize.x, uSize.y - bar));
-        float knobs = 0.0;
-        for (int i = 0; i < 3; i++) {
-          vec2 c = vec2(0.06 + float(i) * 0.05, uSize.y - bar * 0.5);
-          knobs += 1.0 - smoothstep(0.012, 0.012 + aa.x * 1.5, length(p - c));
-        }
-        float a = frame * 0.45 + title * 0.05 + rule * 0.3 + knobs * 0.3;
-        if (uCode > 0.5) {
-          // short indented lines of code and a blinking caret after the last one
-          float lh = 0.07;
-          float row = floor((uSize.y - bar - 0.05 - p.y) / lh);
-          float yIn = fract((uSize.y - bar - 0.05 - p.y) / lh);
-          if (row >= 0.0 && row < 7.0) {
-            float ind = floor(hash11(row * 7.1) * 3.0) * 0.06;
-            float len = 0.18 + hash11(row * 3.3 + 1.0) * (uSize.x - 0.42 - ind);
-            if (row == 6.0) len = 0.22;
-            float on = box(vec2(p.x, yIn), vec2(0.08 + ind, 0.32), vec2(0.08 + ind + len, 0.62));
-            a += on * 0.32;
-            if (row == 6.0) {
-              float caret = box(vec2(p.x, yIn), vec2(0.1 + ind + len, 0.18), vec2(0.122 + ind + len, 0.86));
-              a += caret * step(0.5, fract(uTime * 0.9)) * 1.4;
-            }
-          }
-        }
-        float s = scrS(vW);
-        a *= uGlow * exp(-s * 0.12) * scrFar(s);
-        if (a < 0.002) discard;
-        gl_FragColor = vec4(${PH} * a, 1.0);
-      }`,
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-  mesh.frustumCulled = false;
-  return mesh;
-}
-
-/** Everything behind the glass: the room and a few windows at increasing depth. */
-export function buildInterior(scr, uTime) {
+/** The digital space behind the glass. Project scenes are added to it by the projects themselves. */
+export function buildInterior(scr) {
   const g = new THREE.Group();
   g.name = 'projects-interior';
   g.add(interiorRoom(scr, 8));
-  const wins = [
-    { x: -0.86, y: -0.46, z: -0.42, w: 1.0, h: 0.62, code: 1, glow: 0.75 },
-    { x: 0.95, y: 0.42, z: -1.9, w: 1.5, h: 0.95, glow: 0.42 },
-    { x: -1.1, y: 0.55, z: -3.6, w: 2.0, h: 1.25, glow: 0.34 },
-    { x: 0.6, y: -0.35, z: -5.8, w: 2.6, h: 1.6, glow: 0.3 },
-  ];
-  for (const o of wins) {
-    const m = interiorWindow(scr, uTime, o);
-    m.position.set(o.x, o.y, o.z);
-    g.add(m);
-  }
   return g;
 }
 
-// ---- objects that cross the glass ----
+// ---- objects that cross the glass, and the portals ----
+
+// Every object can be cut by up to two planes (a portal it is passing through keeps only the part on
+// its side), and can be marked physical: then it is drawn as an ordinary object wherever it is.
+// That matters because the glass plane runs on below the screen: the head leans back, so the deck in
+// front of the console lies geometrically "behind" the glass and would otherwise be masked away.
+export const CLIP_GLSL = /* glsl */ `
+uniform vec4 uClip0;
+uniform vec4 uClip1;
+uniform float uPhys;
+// distance to the nearest active cutting plane (an inactive plane is (0, 0, 0, 1))
+float clipDist(vec3 w) { return min(dot(uClip0.xyz, w) + uClip0.w, dot(uClip1.xyz, w) + uClip1.w); }
+float stageS(vec3 w) { return uPhys > 0.5 ? -1.0 : scrS(w); }
+`;
+export const NO_CLIP = new THREE.Vector4(0, 0, 0, 1);
 
 const PART_GEO = {
   box: (s) => new THREE.BoxGeometry(s[0], s[1], s[2]),
   node: (s) => new THREE.IcosahedronGeometry(s[0], 0),
+  cyl: (s) => new THREE.CylinderGeometry(s[0], s[1] ?? s[0], s[2], s[3] ?? 18),
+  rbox: (s) => new RoundedBoxGeometry(s[0], s[1], s[2], 2, s[3] ?? 0.012),
 };
 
 /**
- * A physical object built from simple parts, drawn three ways at once: its surface, its edges and
+ * Geometry for an object built from simple parts: surface (with vertex colours), edges, and samples
+ * of the surface. Built once and shared by every instance of the object.
+ */
+export function buildCrossingGeometry(parts, { samples = 1100, seed = 1 } = {}) {
+  const solids = [], edges = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+  for (const p of parts) {
+    let geo = PART_GEO[p.type](p.size);
+    if (geo.index) geo = geo.toNonIndexed();
+    e.set(...(p.rot ?? [0, 0, 0]));
+    m.compose(new THREE.Vector3(...p.pos), q.setFromEuler(e), one);
+    const col = new THREE.Color(p.color);
+    const n = geo.attributes.position.count;
+    const c = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.toArray(c, i * 3);
+    geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    geo.deleteAttribute('uv');
+    geo.applyMatrix4(m);
+    solids.push(geo);
+    const eg = new THREE.EdgesGeometry(PART_GEO[p.type](p.size), 25);
+    eg.applyMatrix4(m);
+    edges.push(eg);
+  }
+  const solid = mergeGeometries(solids);
+  solid.computeBoundingBox();
+  solid.computeBoundingSphere();
+  const sampler = new MeshSurfaceSampler(new THREE.Mesh(solid)).setRandomGenerator(mulberry32(seed)).build();
+  const pos = new Float32Array(samples * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < samples; i++) {
+    sampler.sample(v);
+    v.toArray(pos, i * 3);
+  }
+  const points = new THREE.BufferGeometry();
+  points.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  return { solid, edges: mergeGeometries(edges), points, box: solid.boundingBox, radius: solid.boundingSphere.radius };
+}
+
+/** Corner brackets around a box plus a row of confidence ticks above it: a detection frame. */
+function trackerGeometry(box, pad = 0.06) {
+  const lo = box.min.clone().subScalar(pad), hi = box.max.clone().addScalar(pad);
+  const k = Math.min(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) * 0.3;
+  const pos = [], tick = [];
+  for (const x of [lo.x, hi.x]) for (const y of [lo.y, hi.y]) for (const z of [lo.z, hi.z]) {
+    const sx = x === lo.x ? 1 : -1, sy = y === lo.y ? 1 : -1, sz = z === lo.z ? 1 : -1;
+    pos.push(x, y, z, x + sx * k, y, z, x, y, z, x, y + sy * k, z, x, y, z, x, y, z + sz * k);
+    for (let i = 0; i < 6; i++) tick.push(-1);
+  }
+  // five confidence ticks standing on the top edge
+  for (let i = 0; i < 5; i++) {
+    const x = THREE.MathUtils.lerp(lo.x, hi.x, 0.2 + i * 0.15);
+    pos.push(x, hi.y + 0.02, hi.z, x, hi.y + 0.065, hi.z);
+    tick.push(i, i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aTick', new THREE.Float32BufferAttribute(tick, 1));
+  return g;
+}
+
+/**
+ * One drawn instance of a physical object, rendered three ways at once: its surface, its edges and
  * samples of its surface. Which of them shows at any point depends only on how far past the glass
- * that point is.
+ * that point is. Several instances can share one geometry (a portal draws an object on both sides).
  */
 export class CrossingObject {
-  constructor(ctx, scr, { parts, roughness = 0.6, metalness = 0.15, samples = 1100, grid = 0.085, seed = 1 }) {
+  constructor(ctx, scr, geo, { roughness = 0.6, metalness = 0.15, grid = 0.085, tracker = false } = {}) {
+    this.geo = geo;
+    this.radius = geo.radius;
     this.group = new THREE.Group();
-    this.uniforms = { uObjS: { value: -10 } };
-    const solids = [], edges = [];
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
-    for (const p of parts) {
-      let geo = PART_GEO[p.type](p.size);
-      if (geo.index) geo = geo.toNonIndexed();
-      e.set(...(p.rot ?? [0, 0, 0]));
-      m.compose(new THREE.Vector3(...p.pos), q.setFromEuler(e), one);
-      const col = new THREE.Color(p.color);
-      const n = geo.attributes.position.count;
-      const c = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) col.toArray(c, i * 3);
-      geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
-      geo.deleteAttribute('uv');
-      geo.applyMatrix4(m);
-      solids.push(geo);
-      const eg = new THREE.EdgesGeometry(PART_GEO[p.type](p.size), 25);
-      eg.applyMatrix4(m);
-      edges.push(eg);
-    }
-    const solidGeo = mergeGeometries(solids);
-    const edgeGeo = mergeGeometries(edges);
-
+    this.uniforms = {
+      uObjS: { value: -10 },
+      uClip0: { value: NO_CLIP.clone() },
+      uClip1: { value: NO_CLIP.clone() },
+      uPhys: { value: 0 },
+      uConf: { value: 0 },
+      uTrack: { value: 0 },
+      uFlash: { value: 0 },
+    };
     const shared = { ...scr, ...this.uniforms };
-    this.solid = new THREE.Mesh(solidGeo, this.#solidMaterial(shared, roughness, metalness));
+    this.solid = new THREE.Mesh(geo.solid, this.#solidMaterial(shared, roughness, metalness));
     this.solid.castShadow = true;
     this.solid.receiveShadow = true;
     this.solid.customDepthMaterial = this.#depthMaterial(shared);
-    this.wire = new THREE.LineSegments(edgeGeo, this.#wireMaterial(shared));
-    this.points = new THREE.Points(this.#sample(solidGeo, samples, seed), this.#pointsMaterial(shared, ctx, grid));
+    this.wire = new THREE.LineSegments(geo.edges, this.#wireMaterial(shared));
+    this.points = new THREE.Points(geo.points, this.#pointsMaterial(shared, ctx, grid));
     for (const o of [this.solid, this.wire, this.points]) {
       o.frustumCulled = false;
       this.group.add(o);
     }
+    if (tracker) {
+      this.tracker = new THREE.LineSegments(trackerGeometry(geo.box), this.#trackerMaterial(shared));
+      this.tracker.frustumCulled = false;
+      this.group.add(this.tracker);
+    }
+    this.group.visible = false;
     this._v = new THREE.Vector3();
+  }
+
+  /** Keep only the side of `plane` (a THREE.Plane, world space) its normal points to; null clears. */
+  clip(i, plane) {
+    const u = this.uniforms[i ? 'uClip1' : 'uClip0'].value;
+    if (plane) u.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+    else u.copy(NO_CLIP);
   }
 
   #solidMaterial(u, roughness, metalness) {
@@ -303,11 +314,13 @@ export class CrossingObject {
       uniforms: u,
       vertexHeader: 'varying vec3 vWPos; varying vec3 vLoc; varying vec3 vLocN;',
       vertex: { begin_vertex: `#include <begin_vertex>\nvLoc = position; vLocN = objectNormal;\n${worldPosVaryingVertex}` },
-      fragmentHeader: `${SCREEN_GLSL}\nuniform float uObjS;\nvarying vec3 vWPos; varying vec3 vLoc; varying vec3 vLocN;`,
+      fragmentHeader: `${SCREEN_GLSL}\n${CLIP_GLSL}\nuniform float uObjS;\nuniform float uFlash;\nvarying vec3 vWPos; varying vec3 vLoc; varying vec3 vLocN;`,
       fragment: {
         clipping_planes_fragment: /* glsl */ `
           #include <clipping_planes_fragment>
-          float sP = scrS(vWPos);
+          float cd = clipDist(vWPos);
+          if (cd < 0.0) discard;
+          float sP = stageS(vWPos);
           float fdP = gl_FragCoord.z;
           float slice = 0.0;
           if (sP > 0.0) {
@@ -325,10 +338,11 @@ export class CrossingObject {
           vec3 near = (0.5 - abs(fract(gl3) - 0.5)) / max(fwidth(gl3), vec3(1e-4));
           near += step(0.6, abs(normalize(vLocN))) * 1e4;
           float seam = (1.0 - smoothstep(0.6, 1.7, min(min(near.x, near.y), near.z))) * segK;
-          // where the glass cuts the object, a bright section line
-          float cut = (1.0 - smoothstep(0.004, 0.02, -sP)) * (1.0 - slice);`,
-        color_fragment: `#include <color_fragment>\ndiffuseColor.rgb *= (1.0 - seam * 0.75) * (1.0 - slice * 0.9) * (1.0 - cut);`,
-        emissivemap_fragment: `#include <emissivemap_fragment>\ntotalEmissiveRadiance += ${PH} * (seam * (0.2 + 1.4 * segK * segK) + slice * 0.9 + cut * 1.7);`,
+          // where the glass, or a portal, cuts the object: a bright section line
+          float cut = (1.0 - smoothstep(0.004, 0.02, -sP)) * (1.0 - slice) * step(uPhys, 0.5);
+          float pcut = 1.0 - smoothstep(0.004, 0.03, cd);`,
+        color_fragment: `#include <color_fragment>\ndiffuseColor.rgb *= (1.0 - seam * 0.75) * (1.0 - slice * 0.9) * (1.0 - cut) * (1.0 - pcut);`,
+        emissivemap_fragment: `#include <emissivemap_fragment>\ntotalEmissiveRadiance += ${PH} * (seam * (0.2 + 1.4 * segK * segK) + slice * 0.9 + cut * 1.7) + vec3(1.0, 0.45, 0.28) * (pcut * 2.2 + uFlash * 0.9);`,
       },
     });
     return mat;
@@ -339,11 +353,15 @@ export class CrossingObject {
     const mat = new THREE.MeshDepthMaterial();
     patchMaterial(mat, {
       key: 'proj-cross-depth',
-      uniforms: { uScrInv: u.uScrInv },
+      uniforms: { uScrInv: u.uScrInv, uClip0: u.uClip0, uClip1: u.uClip1, uPhys: u.uPhys },
       vertexHeader: 'varying vec3 vWPos;',
       vertex: { begin_vertex: `#include <begin_vertex>\n${worldPosVaryingVertex}` },
-      fragmentHeader: 'uniform mat4 uScrInv; varying vec3 vWPos;',
-      fragment: { clipping_planes_fragment: '#include <clipping_planes_fragment>\nif (-(uScrInv * vec4(vWPos, 1.0)).z > 0.0) discard;' },
+      fragmentHeader: 'uniform mat4 uScrInv; uniform vec4 uClip0; uniform vec4 uClip1; uniform float uPhys; varying vec3 vWPos;',
+      fragment: {
+        clipping_planes_fragment: `#include <clipping_planes_fragment>
+          if (min(dot(uClip0.xyz, vWPos) + uClip0.w, dot(uClip1.xyz, vWPos) + uClip1.w) < 0.0) discard;
+          if (uPhys < 0.5 && -(uScrInv * vec4(vWPos, 1.0)).z > 0.0) discard;`,
+      },
     });
     return mat;
   }
@@ -363,9 +381,11 @@ export class CrossingObject {
         }`,
       fragmentShader: /* glsl */ `
         ${SCREEN_GLSL}
+        ${CLIP_GLSL}
         varying vec3 vW;
         void main() {
-          float s = scrS(vW);
+          if (clipDist(vW) < 0.0) discard;
+          float s = stageS(vW);
           float a = smoothstep(${STAGE.wireIn.toFixed(3)}, ${(STAGE.wireIn + 0.12).toFixed(3)}, s)
                   * (1.0 - smoothstep(${(STAGE.wireOut - 0.14).toFixed(3)}, ${(STAGE.wireOut + 0.1).toFixed(3)}, s));
           if (a < 0.003) discard;
@@ -377,19 +397,6 @@ export class CrossingObject {
     });
   }
 
-  #sample(geo, count, seed) {
-    const sampler = new MeshSurfaceSampler(new THREE.Mesh(geo)).setRandomGenerator(mulberry32(seed)).build();
-    const pos = new Float32Array(count * 3);
-    const v = new THREE.Vector3();
-    for (let i = 0; i < count; i++) {
-      sampler.sample(v);
-      v.toArray(pos, i * 3);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    return g;
-  }
-
   #pointsMaterial(u, ctx, grid) {
     return new THREE.ShaderMaterial({
       uniforms: { ...u, uScale: ctx.uniforms.uPointScale, uGrid: { value: grid } },
@@ -398,13 +405,14 @@ export class CrossingObject {
       blending: THREE.AdditiveBlending,
       vertexShader: /* glsl */ `
         ${SCREEN_GLSL}
+        ${CLIP_GLSL}
         uniform float uScale;
         uniform float uGrid;
         varying vec3 vW;
         varying float vA;
         varying float vQ;
         void main() {
-          float s0 = scrS((modelMatrix * vec4(position, 1.0)).xyz);
+          float s0 = stageS((modelMatrix * vec4(position, 1.0)).xyz);
           // deeper in, samples settle onto a lattice in the object's own frame
           vQ = smoothstep(${STAGE.quantA.toFixed(3)}, ${STAGE.quantB.toFixed(3)}, s0);
           vec3 lp = mix(position, (floor(position / uGrid) + 0.5) * uGrid, vQ);
@@ -417,10 +425,12 @@ export class CrossingObject {
         }`,
       fragmentShader: /* glsl */ `
         ${SCREEN_GLSL}
+        ${CLIP_GLSL}
         varying vec3 vW;
         varying float vA;
         varying float vQ;
         void main() {
+          if (clipDist(vW) < 0.0) discard;
           vec2 c = abs(gl_PointCoord - 0.5) * 2.0;
           float d = mix(length(c), max(c.x, c.y), vQ);
           float shape = 1.0 - smoothstep(mix(0.3, 0.7, vQ), 1.0, d);
@@ -433,42 +443,53 @@ export class CrossingObject {
     });
   }
 
+  #trackerMaterial(u) {
+    // a detection frame: visible wherever the object is, physical or inside the screen
+    return new THREE.ShaderMaterial({
+      uniforms: u,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: /* glsl */ `
+        attribute float aTick;
+        varying vec3 vW;
+        varying float vTick;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vW = wp.xyz; vTick = aTick;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }`,
+      fragmentShader: /* glsl */ `
+        ${SCREEN_GLSL}
+        ${CLIP_GLSL}
+        uniform float uConf;
+        uniform float uTrack;
+        varying vec3 vW;
+        varying float vTick;
+        void main() {
+          if (uTrack < 0.01 || clipDist(vW) < 0.0) discard;
+          float fd = gl_FragCoord.z;
+          if (stageS(vW) > 0.0 && !scrSee(vW, fd)) discard;
+          gl_FragDepth = fd;
+          // corner brackets always; ticks light up to the current confidence
+          float on = vTick < 0.0 ? 1.0 : step(vTick + 0.5, uConf * 5.0);
+          vec3 col = mix(vec3(1.0, 0.42, 0.26), ${PH}, smoothstep(0.6, 1.0, uConf));
+          gl_FragColor = vec4(col * on * uTrack * (vTick < 0.0 ? 1.9 : 2.2), 1.0);
+        }`,
+    });
+  }
+
   /** Call after the object's transform changes; `scrInv` maps world to screen space. */
   update(scrInv) {
     this.group.getWorldPosition(this._v).applyMatrix4(scrInv);
     this.uniforms.uObjS.value = -this._v.z;
   }
+
+  /** Signed distance of the object's centre past the glass (negative: in front). */
+  get centreS() {
+    return this.uniforms.uObjS.value;
+  }
 }
 
-// An unresolved assembly: blocks, rods and nodes that do not agree with one another.
-// Its long axis runs along z (it crosses the glass along it), drawn out a little.
-const stretch = (parts, k) => parts.map((p) => ({ ...p, pos: [p.pos[0], p.pos[1], p.pos[2] * k] }));
-export const PROBLEM_PARTS = stretch([
-  { type: 'box', size: [0.42, 0.3, 0.5], pos: [-0.15, 0.05, 0.36], rot: [0.3, 0.5, 0.1], color: '#a8a39a' },
-  { type: 'box', size: [0.3, 0.36, 0.34], pos: [0.22, -0.12, 0.06], rot: [-0.4, 0.2, 0.6], color: '#4d5560' },
-  { type: 'box', size: [0.5, 0.16, 0.28], pos: [0.04, 0.2, -0.3], rot: [0.2, -0.7, 0.3], color: '#6a6763' },
-  { type: 'box', size: [0.22, 0.22, 0.22], pos: [-0.3, -0.18, -0.22], rot: [0.8, 0.3, 0.2], color: '#a8a39a' },
-  { type: 'box', size: [0.34, 0.12, 0.4], pos: [0.26, 0.22, 0.44], rot: [-0.2, 0.9, -0.3], color: '#4d5560' },
-  { type: 'box', size: [0.18, 0.3, 0.18], pos: [0.0, -0.25, -0.55], rot: [0.5, 0.1, 0.9], color: '#6a6763' },
-  { type: 'box', size: [0.035, 0.035, 1.1], pos: [0.05, 0.0, 0.0], rot: [0.25, 0.35, 0.0], color: '#8a8e93' },
-  { type: 'box', size: [0.035, 0.035, 0.8], pos: [-0.1, 0.1, -0.1], rot: [1.1, 0.2, 0.4], color: '#8a8e93' },
-  { type: 'box', size: [0.035, 0.035, 0.7], pos: [0.2, -0.05, -0.35], rot: [0.3, -0.9, 1.2], color: '#8a8e93' },
-  { type: 'node', size: [0.09], pos: [-0.33, 0.28, -0.05], color: '#a8a39a' },
-  { type: 'node', size: [0.08], pos: [0.34, -0.28, 0.3], color: '#4d5560' },
-  { type: 'node', size: [0.085], pos: [0.15, 0.33, -0.55], color: '#a8a39a' },
-], 1.25);
-
-// The same vocabulary resolved: blocks on a common grid, straight rails, nodes at their ends.
-export const RESOLVED_PARTS = [
-  { type: 'box', size: [0.8, 0.06, 1.1], pos: [0, -0.2, 0], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.2, 0.3], pos: [-0.2, -0.07, -0.36], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.32, 0.3], pos: [0.2, -0.01, -0.36], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.26, 0.3], pos: [-0.2, -0.04, 0.0], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.14, 0.3], pos: [0.2, -0.1, 0.0], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.38, 0.3], pos: [-0.2, 0.02, 0.36], color: '#b8b1a4' },
-  { type: 'box', size: [0.3, 0.2, 0.3], pos: [0.2, -0.07, 0.36], color: '#c4472f' },
-  { type: 'box', size: [0.035, 0.035, 1.1], pos: [-0.43, -0.15, 0], color: '#3a3c40' },
-  { type: 'box', size: [0.035, 0.035, 1.1], pos: [0.43, -0.15, 0], color: '#3a3c40' },
-  { type: 'node', size: [0.06], pos: [-0.43, -0.15, -0.58], color: '#b8b1a4' },
-  { type: 'node', size: [0.06], pos: [0.43, -0.15, 0.58], color: '#b8b1a4' },
-];
+/** The phosphor colour as a GLSL vec3 literal. */
+export const PHOSPHOR_GLSL = PH;
