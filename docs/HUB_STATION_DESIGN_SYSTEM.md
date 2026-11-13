@@ -59,8 +59,9 @@ Rules:
   whether the environment genuinely conflicts with it. (The rune band, pedestal shape and floating
   underside were all kept for this reason; they are still on the "evaluate later" list.)
 - **No center object.** The open middle and floor medallion are intentional breathing room.
-- The four-slot composition stays: Resume −45° (Fire's slot), Profile −135° (Earth's),
-  Projects 135° (Water's), Experience 45° (Air's).
+- The four-slot composition stays (azimuths from `src/config.js`): Resume −45° (Fire's slot,
+  front left), Profile −135° (Earth's, back left), Projects 45° (Air's, front right), Experience
+  135° (Water's, back right).
 
 ## 3. Panel discipline
 
@@ -306,8 +307,8 @@ appendix.
 
 | Station (slot) | Candidate | Original idea |
 | --- | --- | --- |
-| Experience (Air, 45°) | Harmonograph / pendulum plotter | Experience as the trace of sustained motion over time; each role its own rhythm, overlaid into one record |
-| Projects (Water, 135°) | Six-piece burr puzzle | Projects as interlocking constraint problems; each piece one project, it only works because of the others |
+| Experience (Water, 135°) | Harmonograph / pendulum plotter | Experience as the trace of sustained motion over time; each role its own rhythm, overlaid into one record |
+| Projects (Air, 45°) | Six-piece burr puzzle | Projects as interlocking constraint problems; each piece one project, it only works because of the others |
 | Profile (Earth, −135°) | Portrait zoetrope | A person as a sequence of moments; an optical device that animates a portrait |
 
 ## 29. Resume as the quality reference
