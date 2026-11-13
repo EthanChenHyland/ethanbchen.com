@@ -132,6 +132,23 @@ These all build on the existing recompose and reframe system:
 Long real-time audits should run against a production build, not the dev server: an edit hot-reloads the
 page and silently ends a run.
 
+## Glyph
+
+The canonical Projects glyph (`GLYPH_STROKES.projects` in `src/ui/glyphs.js`) is a wide frame in
+the proportion of the console's screen, open on one side, with a built object (a small isometric
+cube) halfway through it: a project crossing from the machine into the world. It replaced the
+inherited Air triangle in the dock, info panel, loading ring, the floor mark beside the station
+and the centre floor medallion (`Platform.js`, kind 6).
+
+- Straight strokes only, on the shared 24-unit grid and 1.6 stroke, matched in apparent weight and
+  optical centre to Resume and Profile, and checked at real dock size at Retina and 1×.
+- Its centre-medallion emission is lifted ×1.75: the station's red-orange has about half the
+  luminance of the other station colours, and without the lift the glyph read as switched off.
+- No glyph animation (Resume and Profile have none).
+- Rejected while choosing it: a plain frame and square (read as exit or picture-in-picture), depth
+  lines (a door), a stand (a desktop monitor), a portrait frame (too close to Resume's page), and
+  generic code, terminal, folder or portal icons.
+
 ## Known minor issues
 
 - Micro transfers may read as too light by ear; the hover-hold bed and major-portal swell await a listen.
@@ -152,6 +169,5 @@ Do not reopen these without a new brief:
 - the viewer-facing turntable model and its parameters;
 - the hover, focus, reselect and return states, with their sound;
 - the Projects focus-orbit arc;
-- the camera breathing in all contexts.
-
-The Projects glyph is still the placeholder.
+- the camera breathing in all contexts;
+- the canonical glyph.

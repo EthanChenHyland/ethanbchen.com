@@ -25,6 +25,24 @@ export const GLYPH_STROKES = {
     [18.6, 16.4, 18.6, 21],
     [12, 13.6, 12, 21],
   ],
+  // Projects: the Threshold Console's screen, wide and open on one side, with a built object
+  // halfway through it (a thing crossing from the machine into the world)
+  projects: [
+    [15.6, 8, 15.6, 5.2],
+    [15.6, 5.2, 2.8, 5.2],
+    [2.8, 5.2, 2.8, 18.4],
+    [2.8, 18.4, 15.6, 18.4],
+    [15.6, 18.4, 15.6, 16],
+    [12.2, 9.8, 16.6, 7.6],
+    [16.6, 7.6, 21, 9.8],
+    [21, 9.8, 21, 14.2],
+    [21, 14.2, 16.6, 16.4],
+    [16.6, 16.4, 12.2, 14.2],
+    [12.2, 14.2, 12.2, 9.8],
+    [12.2, 9.8, 16.6, 12],
+    [16.6, 12, 21, 9.8],
+    [16.6, 12, 16.6, 16.4],
+  ],
 };
 
 const f = (v) => +v.toFixed(3);

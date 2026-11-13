@@ -6,7 +6,7 @@ import { ELEMENTS, PLATFORM_RADIUS, stationPosition } from '../config.js';
 import { makeRockGeometry } from './rocks.js';
 import { glyphGLSL } from '../ui/glyphs.js';
 
-const GLYPHS = ['fire', 'air', 'water', 'earth', 'resume', 'profile'];
+const GLYPHS = ['fire', 'air', 'water', 'earth', 'resume', 'profile', 'projects'];
 
 const FLOOR_GLSL = /* glsl */ `
 uniform float uTime;
@@ -36,11 +36,13 @@ float udTri(vec2 p, float r) {
 }
 ${glyphGLSL('resume', 'resumeGlyph')}
 ${glyphGLSL('profile', 'profileGlyph')}
-// kind: 4 resume, 5 profile (stroke glyphs); 0 fire, 1 air, 2 water, 3 earth — the alchemical
-// triangles the other stations still borrow
+${glyphGLSL('projects', 'projectsGlyph')}
+// kind: 4 resume, 5 profile, 6 projects (stroke glyphs); 0 fire, 1 air, 2 water, 3 earth — the
+// alchemical triangles the other station still borrows
 float glyphDist(vec2 q, int kind, float s) {
   if (kind == 4) return resumeGlyph(q, s);
   if (kind == 5) return profileGlyph(q, s);
+  if (kind == 6) return projectsGlyph(q, s);
   if (kind >= 2) q.y = -q.y;
   float d = udTri(q, s);
   if (kind == 1 || kind == 3) d = min(d, sdSeg(q, vec2(-0.95 * s, 0.16 * s), vec2(0.95 * s, 0.16 * s)));
@@ -161,7 +163,9 @@ void floorSurface(vec2 p) {
       // stroke glyphs read from outside the ring, like their station mark (the triangles are symmetric)
       if (uStGlyph[i] >= 4) q.y = -q.y;
       float gm = lineMask(glyphDist(q, uStGlyph[i], 0.2), 0.02);
-      medEmit += uStCol[i] * gm * (2.2 + 2.0 * uStGlow[i]);
+      // (the Projects colour carries about half the luminance of the others: its glyph is lifted to
+      // the same perceived brightness, so it never reads as switched off)
+      medEmit += uStCol[i] * gm * (2.2 + 2.0 * uStGlow[i]) * (uStGlyph[i] == 6 ? 1.75 : 1.0);
       medAlb = mix(medAlb, medAlb * 0.3, gm);
     }
     float mm = lineMask(md, 0.018);

@@ -13,8 +13,8 @@ const deg = THREE.MathUtils.degToRad;
 //
 // Slot properties (azimuth, view, envGlow, color, glyph) belong to the physical station in the
 // slot; identity properties (name, panel copy, url) to the destination.
-// `glyph` names the station's symbol: Resume and Profile have their own; the others still borrow
-// an element's triangle until their glyphs exist.
+// `glyph` names the station's symbol: Resume, Profile and Projects have their own; Experience still
+// borrows an element's triangle until its glyph exists.
 // `url` is where "Open" leads (internal path or external address); leave it
 // empty to hide the link. `envGlow` places a coloured light on the horizon of
 // the reflection environment, behind the station.
@@ -80,7 +80,7 @@ export const ELEMENTS = [
     id: 'projects',
     key: '4',
     name: 'Projects',
-    glyph: 'air',
+    glyph: 'projects',
     color: '#e3684d',
     azimuth: deg(45),
     eyebrow: 'Selected works',
