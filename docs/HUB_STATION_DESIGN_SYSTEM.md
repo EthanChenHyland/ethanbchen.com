@@ -241,8 +241,13 @@ against music that doesn't exist yet.
 
 ## 22. Glyphs
 
-- One canonical definition per station in `src/ui/glyphs.js` (straight strokes on a 24×24 grid).
-  The UI SVG and the floor shader's distance function are both generated from it.
+- One canonical definition per station in `src/ui/glyphs.js` (lines, circular arcs and points on a
+  24×24 grid, 1.6 stroke, round caps). The UI SVG and the floor shader's distance function are both
+  generated from it.
+- Match the family's apparent weight and optical centre, and check at real dock size in headed
+  Chrome at both Retina and 1×, not in a large preview.
+- In the floor medallion a station colour with low luminance can make its glyph read as switched
+  off; lift that glyph's emission to perceived parity rather than changing the shared shader.
 - A glyph appears in more places than it seems: dock, panel, loader ring, the floor mark beside the
   station and the center medallion (`Platform.js`). Audit globally.
 - Asymmetric glyphs expose mirrored frames that the symmetric elemental triangles hid (the
@@ -334,3 +339,41 @@ Copy the depth and coherence, not the paper.
 - [ ] Return transition
 - [ ] No runtime or console errors
 - [ ] Regression check against the previous commit for preserved Opus behavior
+
+## 31. Lessons from Profile
+
+Profile (see [`PROFILE_STATION_HANDOFF.md`](PROFILE_STATION_HANDOFF.md)) established these
+hub-wide principles:
+
+- **Temporal richness, spatial restraint.** Much happens over time, little at once: one small event
+  at a time, often, from several asynchronous systems. A station that piles up simultaneous effects
+  reads as clutter however good each effect is.
+- **Semantic effects, not particle spam.** Every effect is a consequence of the station's idea
+  (a model's answer, a note's resonance, light travelling a seam). Remove an effect before adding
+  a new family; reduce something else when a region gets busier.
+- **Balance the whole artifact.** Distribute life over the full silhouette (for a figure: head,
+  torso, hips, legs and stage) instead of concentrating it at the most obvious point.
+- **Viewer-aware presentation.** An artifact can turn toward or step aside for the viewer
+  (choosing where it stands for visibility from the overview), but through its own physical
+  language, never by spinning.
+- **Focused idle must stay alive.** Calm on arrival, never frozen: life returns with real camera
+  drift from the settled focus direction.
+- **Graded re-engagement from real drift.** Scale the response with measured camera displacement:
+  a tiny re-select gets a tiny acknowledgement.
+- **Keep what matters readable with smooth keep-outs.** Things that move round an artifact stay
+  off its key features with radial keep-outs round the line of sight and capsule clearance from the
+  geometry, fed through springs. Avoid side-memory avoidance, which drags objects back across
+  what it protects.
+- **Clear zones for lines.** Lines, arcs and trails fade where they would cross a region that must
+  stay clean, and route round it.
+- **Every positional push goes through a spring.** Anything derived from the camera reference
+  (which jumps at a flight start) must be smoothed, or objects jump.
+- **Frame validity.** Guard shaders against NaN (`pow` of a negative base), and keep the PostFX
+  guard that drops non-finite pixels and caps single-pixel radiance; one bad pixel through bloom is
+  a frame-wide flash.
+- **Idle sound evolves, never hums.** No oscillator held on one note. A station's idle atmosphere
+  can be continuous only if it keeps moving (wandering filtered bands, breathing, stereo drift, long
+  gaps), sits clearly below every cue, and releases fully when another station is focused.
+- **Measure performance for real.** The hub is GPU pixel-bound at Retina density. Measure in headed
+  Chrome at real window size and DPR (headless at low resolution hides the cost), with the screen
+  unlocked and no hidden preview rendering the site. Keep the adaptive resolution.

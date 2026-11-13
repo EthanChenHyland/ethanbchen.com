@@ -47,7 +47,11 @@ const HazeShader = {
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv + off).b;
       // keep half-float overflow (tiny, very sharp highlights) from poisoning bloom/tone mapping
-      col = max(min(col, vec3(6.0e4)), vec3(0.0));
+      // frame validity: a non-finite pixel (NaN/Inf from any shader) is dropped, and single-pixel
+      // radiance is capped far above anything authored, so one bad pixel can never be spread by
+      // bloom into a frame-wide flash (normal highlights and bloom are unaffected)
+      if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
+      col = clamp(col, vec3(0.0), vec3(24.0));
       gl_FragColor = vec4(col, 1.0);
     }`,
 };

@@ -10,11 +10,11 @@ import { CameraRig } from './core/CameraRig.js';
 import { Resume } from './elements/Resume.js';
 import { Water } from './elements/Water.js';
 import { Projects } from './elements/Projects.js';
-import { Earth } from './elements/Earth.js';
+import { Profile } from './elements/Profile.js';
 
-// Resume replaces Fire and Projects (the Threshold Console) replaces Air; Experience and Profile
-// still run the original Water and Earth elements as placeholders.
-const ELEMENT_CLASSES = { resume: Resume, projects: Projects, experience: Water, profile: Earth };
+// Resume replaces Fire, Projects (the Threshold Console) replaces Air and Profile (the Tempered
+// Figure) replaces Earth; Experience still runs the original Water element as a placeholder.
+const ELEMENT_CLASSES = { resume: Resume, projects: Projects, experience: Water, profile: Profile };
 const UP = new THREE.Vector3(0, 1, 0);
 
 const QUALITY = {
@@ -59,7 +59,10 @@ const RECOMPOSE = {
 const D = THREE.MathUtils.degToRad;
 const FOCUS_RECOMPOSE = {
   resume: { trigger: D(20), breathElev: D(0.8), breathRadius: 0.022, floor: D(2.5) },
-  profile: { trigger: D(22), deadZone: 0.18, breathElev: D(1.8), breathRadius: 0.045, floor: D(2.5) },
+  // the figure's focus orbit (radius ~9.8) would otherwise circle into Resume's page (8.5 away, at 0°
+  // round the figure), Experience (90°) and Projects (45°, on the hub side): its idle orbit keeps to
+  // the outer arc between them, measured ≥5.3 clear of both neighbours
+  profile: { trigger: D(22), deadZone: 0.18, breathElev: D(1.8), breathRadius: 0.045, floor: D(2.5), orbitWindow: [D(123), D(327)] },
   experience: { trigger: D(22), deadZone: 0.18, breathElev: D(1.8), breathRadius: 0.045, floor: D(2.5) },
   // the console's focus orbit (radius ~10.4) would pass through Resume's page (8.5 away, at -90°
   // round the console) and Experience (180°): its idle orbit keeps to the arc between them, easing
@@ -281,7 +284,9 @@ export class App {
     const ahead = o.dir > 0 ? half - rel : half + rel;
     const D = THREE.MathUtils.degToRad;
     const ease = THREE.MathUtils.smoothstep(ahead, D(1.5), D(28));
-    if (ahead < D(3) && Math.abs(o.k) < 0.06) {
+    // turn back once the camera has effectively come to rest near the end (the eased approach is
+    // asymptotic: waiting to be within 3° left it crawling at near-zero speed for tens of seconds)
+    if (ahead < D(12) && Math.abs(o.k) < 0.2) {
       o.dwell += dt;
       if (o.dwell > 1.1) (o.dir = -o.dir), (o.dwell = 0);
     } else o.dwell = 0;
@@ -340,8 +345,32 @@ export class App {
   pick(ndc) {
     this._ray ??= new THREE.Raycaster();
     this._ray.setFromCamera(ndc, this.camera);
-    const hit = this._ray.intersectObjects(this.hitTargets, false)[0];
-    return hit ? hit.object.userData.elementId : null;
+    const hits = this._ray.intersectObjects(this.hitTargets, false);
+    if (hits.length < 2) return hits[0]?.object.userData.elementId ?? null;
+    // several stations' (invisible) hit volumes overlap under the pointer: prefer the station whose
+    // VISIBLE geometry is actually there, nearest first; a station can supply its own cheap test
+    // (pickVisible), otherwise its plain visible meshes are tested; with no visible hit at all, the
+    // nearest volume wins as before
+    let best = null, bestD = Infinity;
+    for (const h of hits) {
+      const e = this.elements.find((x) => x.def.id === h.object.userData.elementId);
+      if (!e) continue;
+      let d = e.pickVisible ? e.pickVisible(this._ray) : this.#visibleDistance(e);
+      if (d != null && d < bestD) (bestD = d), (best = e.def.id);
+    }
+    return best ?? hits[0].object.userData.elementId;
+  }
+
+  /** Nearest hit on a station's plain visible meshes (no skinned meshes, points or lines). */
+  #visibleDistance(e) {
+    const c = (this._pickCache ??= new Map());
+    let entry = c.get(e);
+    if (!entry || this.time - entry.t > 2) {
+      const list = [];
+      e.group.traverseVisible((o) => { if (o.isMesh && !o.isSkinnedMesh && !o.isInstancedMesh && o !== e.hit && o.geometry) list.push(o); });
+      c.set(e, (entry = { t: this.time, list }));
+    }
+    return this._ray.intersectObjects(entry.list, false)[0]?.distance ?? null;
   }
 
   #tick() {

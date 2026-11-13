@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { ResumeSound } from './ResumeSound.js';
 import { ProjectsSound } from './ProjectsSound.js';
+import { ProfileSound } from './ProfileSound.js';
 
 /**
  * Fully procedural ambience (no audio files): the self-writing
- * document at Resume (see ResumeSound), and for now the original water and earth
- * voices at the stations that still run those elements. Each station has its
+ * document at Resume (see ResumeSound), the Projects console (ProjectsSound), the Profile
+ * figure (ProfileSound), and for now the original water voice at Experience. Each station has its
  * own bus whose gain and stereo pan follow the camera.
  */
 export class Soundscape {
@@ -140,12 +141,8 @@ export class Soundscape {
     this.drops = this.#gain(0.5);
     this.drops.connect(this.bus.experience);
 
-    // ---- earth: deep rumble + occasional stone knocks ----
-    const rumbleGain = this.#gain(0.9);
-    this.#loop(brown).connect(this.#filter('lowpass', 95, 0.9)).connect(rumbleGain).connect(this.bus.profile);
-    this.#lfo(0.06, 0.35, rumbleGain.gain);
-    this.knocks = this.#gain(0.5);
-    this.knocks.connect(this.bus.profile);
+    // ---- profile: the Tempered Figure's harmonic voice (see ProfileSound; vertical slice) ----
+    this.profile = new ProfileSound(ctx, this.bus.profile, this.pan.profile);
 
     // The original Opus hub drone (four oscillators at 55, 82.4, 110.3 and 164.8 Hz) is not built:
     // it read as a constant hum. The hub's ambience will be designed once all four stations exist.
@@ -185,10 +182,6 @@ export class Soundscape {
       o.start(t0);
       o.stop(t0 + 0.14);
     }
-    // earth knocks
-    if (Math.random() < 0.025) {
-      this.#burst(this.knocks, t0, { freq: 180 + Math.random() * 120, type: 'lowpass', Q: 2, amp: 0.8, decay: 0.16, dur: 0.2 });
-    }
   }
 
   /** Mix buses from the camera's position relative to each element. */
@@ -202,6 +195,7 @@ export class Soundscape {
       const id = el.def.id;
       if (id === 'resume') this.resume.update(el, camera, this._right);
       if (id === 'projects') this.projects.update(el);
+      if (id === 'profile') (this.profile.presence(focused), this.profile.update(el));
       el.group.getWorldPosition(this._v);
       this._v.y += 2.2;
       const d = this._v.distanceTo(camera.position);
